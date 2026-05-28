@@ -36,6 +36,36 @@ interface Props {
   socials: SocialLinks | null;
 }
 
+/** Prevent infinite hangs if the Supabase fetch never resolves. */
+const PROFILE_SAVE_TIMEOUT_MS = 20_000;
+
+async function updateProfileWithTimeout(
+  supabase: ReturnType<typeof createClient>,
+  profileId: string,
+  payload: Record<string, string | null>,
+) {
+  const updatePromise = supabase
+    .from("profiles")
+    .update(payload as never)
+    .eq("id", profileId)
+    .select("id")
+    .maybeSingle();
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(
+      () =>
+        reject(
+          new Error(
+            "Profile save timed out — check your network or sign in again.",
+          ),
+        ),
+      PROFILE_SAVE_TIMEOUT_MS,
+    );
+  });
+
+  return Promise.race([updatePromise, timeoutPromise]);
+}
+
 export function ProfileSettingsForm({ profile, socials }: Props) {
   const patchProfile = useAuthStore((s) => s.patchProfile);
   const [savingProfile, setSavingProfile] = React.useState(false);
@@ -262,10 +292,18 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       toast.success("Profile saved");
 
       console.log("BEFORE SUPABASE");
-      const { error } = await supabase
-        .from("profiles")
-        .update(normalized as never)
-        .eq("id", profile.id);
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      console.log("AUTH SESSION", {
+        hasSession: Boolean(sessionData.session),
+        sessionError: sessionError?.message ?? null,
+      });
+
+      const { error } = await updateProfileWithTimeout(
+        supabase,
+        profile.id,
+        normalized,
+      );
       console.log("AFTER SUPABASE");
 
       if (!error) {
