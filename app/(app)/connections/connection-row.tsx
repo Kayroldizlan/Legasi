@@ -7,7 +7,11 @@ import * as React from "react";
 import toast from "react-hot-toast";
 
 import { Avatar, Button } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
+import {
+  acceptConnectionAction,
+  cancelConnectionRequestAction,
+  declineConnectionAction,
+} from "@/lib/actions/connections";
 import { buildProfileUrl, formatRelativeTime } from "@/lib/utils";
 
 import type { Connection, Profile } from "@/types/database";
@@ -21,32 +25,50 @@ interface Props {
 export function ConnectionRow({ connection, partner, mode }: Props) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
+  const [hidden, setHidden] = React.useState(false);
 
   const accept = async () => {
     setBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("connections")
-      .update({ status: "accepted", responded_at: new Date().toISOString() } as never)
-      .eq("id", connection.id);
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    toast.success("Connection accepted");
-    router.refresh();
+    try {
+      const result = await acceptConnectionAction(
+        connection.id,
+        partner.username,
+      );
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      setHidden(true);
+      toast.success("Connection accepted");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
   };
 
   const decline = async () => {
     setBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("connections")
-      .delete()
-      .eq("id", connection.id);
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    toast.success(mode === "incoming" ? "Request declined" : "Request cancelled");
-    router.refresh();
+    try {
+      const result =
+        mode === "incoming"
+          ? await declineConnectionAction(connection.id, partner.username)
+          : await cancelConnectionRequestAction(connection.id, partner.username);
+
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      setHidden(true);
+      toast.success(
+        mode === "incoming" ? "Request declined" : "Request cancelled",
+      );
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
   };
+
+  if (hidden) return null;
 
   return (
     <div className="card flex flex-col sm:flex-row sm:items-center justify-between gap-3">

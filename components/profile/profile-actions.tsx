@@ -7,7 +7,11 @@ import * as React from "react";
 import toast from "react-hot-toast";
 
 import { Button, Modal } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
+import {
+  acceptConnectionAction,
+  cancelConnectionRequestAction,
+  sendConnectionRequestAction,
+} from "@/lib/actions/connections";
 import { absoluteUrl, buildProfileUrl } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -48,40 +52,54 @@ export function ProfileActions({ profile, initialConnection }: Props) {
       return;
     }
     setBusy(true);
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("connections")
-      .insert({ requester_id: me.id, addressee_id: profile.id } as never)
-      .select()
-      .single();
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    setConn(data as Connection);
-    toast.success("Connection request sent");
+    try {
+      const result = await sendConnectionRequestAction(
+        profile.id,
+        profile.username,
+      );
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      setConn(result.data);
+      toast.success("Connection request sent");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const acceptConnect = async () => {
     if (!conn) return;
     setBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("connections")
-      .update({ status: "accepted", responded_at: new Date().toISOString() } as never)
-      .eq("id", conn.id);
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    setConn({ ...conn, status: "accepted" });
-    toast.success("Connection accepted");
+    try {
+      const result = await acceptConnectionAction(conn.id, profile.username);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      setConn(result.data);
+      toast.success("Connection accepted");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const cancelConnect = async () => {
     if (!conn) return;
     setBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase.from("connections").delete().eq("id", conn.id);
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    setConn(null);
+    try {
+      const result = await cancelConnectionRequestAction(
+        conn.id,
+        profile.username,
+      );
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      setConn(null);
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (isOwn) {
