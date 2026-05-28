@@ -227,66 +227,89 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       country: profile.country,
     };
 
-    // OPTIMISTIC UI — store + form update instantly, success toast
-    // appears in the same render frame. The user-perceived latency is
-    // bounded by browser frame time, not the Supabase roundtrip.
-    patchProfile(normalized as Partial<Profile>);
-    profileForm.reset({
-      full_name: normalized.full_name,
-      username: normalized.username,
-      occupation: normalized.occupation ?? "",
-      company: normalized.company ?? "",
-      bio: normalized.bio ?? "",
-      phone: normalized.phone ?? "",
-      website: normalized.website ?? "",
-      address: normalized.address ?? "",
-      city: normalized.city ?? "",
-      country: normalized.country ?? "",
-    });
-    toast.success("Profile saved");
-
-    // Background verification. The Save button is briefly disabled to
-    // prevent rapid double-submits.
-    console.log("PROFILE UPDATE RUNNING");
+    console.log("LOADING TRUE");
     setSavingProfile(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update(normalized as never)
-      .eq("id", profile.id);
-    setSavingProfile(false);
 
-    if (!error) {
-      console.log("SUPABASE UPDATE SUCCESS");
-      return;
-    }
+    try {
+      // OPTIMISTIC UI — store + form update instantly, success toast
+      // appears in the same render frame. The user-perceived latency is
+      // bounded by browser frame time, not the Supabase roundtrip.
+      patchProfile(normalized as Partial<Profile>);
+      profileForm.reset({
+        full_name: normalized.full_name,
+        username: normalized.username,
+        occupation: normalized.occupation ?? "",
+        company: normalized.company ?? "",
+        bio: normalized.bio ?? "",
+        phone: normalized.phone ?? "",
+        website: normalized.website ?? "",
+        address: normalized.address ?? "",
+        city: normalized.city ?? "",
+        country: normalized.country ?? "",
+      });
+      toast.success("Profile saved");
 
-    // Roll the optimistic update back to match the actual DB state.
-    patchProfile(previous as Partial<Profile>);
-    profileForm.reset({
-      full_name: previous.full_name,
-      username: previous.username,
-      occupation: previous.occupation ?? "",
-      company: previous.company ?? "",
-      bio: previous.bio ?? "",
-      phone: previous.phone ?? "",
-      website: previous.website ?? "",
-      address: previous.address ?? "",
-      city: previous.city ?? "",
-      country: previous.country ?? "",
-    });
+      console.log("PROFILE UPDATE RUNNING");
+      const { error } = await supabase
+        .from("profiles")
+        .update(normalized as never)
+        .eq("id", profile.id);
 
-    console.log("SUPABASE UPDATE ERROR", error);
-    if (
-      error.code === "23505" ||
-      /duplicate key|unique constraint/i.test(error.message)
-    ) {
-      toast.error(
-        "That username is already taken — your changes were rolled back.",
-      );
-    } else {
-      toast.error(
-        `Could not save profile: ${error.message || "please try again"}`,
-      );
+      if (!error) {
+        console.log("SUPABASE UPDATE SUCCESS");
+      } else {
+        // Roll the optimistic update back to match the actual DB state.
+        patchProfile(previous as Partial<Profile>);
+        profileForm.reset({
+          full_name: previous.full_name,
+          username: previous.username,
+          occupation: previous.occupation ?? "",
+          company: previous.company ?? "",
+          bio: previous.bio ?? "",
+          phone: previous.phone ?? "",
+          website: previous.website ?? "",
+          address: previous.address ?? "",
+          city: previous.city ?? "",
+          country: previous.country ?? "",
+        });
+
+        console.log("SUPABASE UPDATE ERROR", error);
+        if (
+          error.code === "23505" ||
+          /duplicate key|unique constraint/i.test(error.message)
+        ) {
+          toast.error(
+            "That username is already taken — your changes were rolled back.",
+          );
+        } else {
+          toast.error(
+            `Could not save profile: ${error.message || "please try again"}`,
+          );
+        }
+      }
+    } catch (error: unknown) {
+      // Roll back optimistic state for unexpected failures.
+      patchProfile(previous as Partial<Profile>);
+      profileForm.reset({
+        full_name: previous.full_name,
+        username: previous.username,
+        occupation: previous.occupation ?? "",
+        company: previous.company ?? "",
+        bio: previous.bio ?? "",
+        phone: previous.phone ?? "",
+        website: previous.website ?? "",
+        address: previous.address ?? "",
+        city: previous.city ?? "",
+        country: previous.country ?? "",
+      });
+
+      console.log("SUPABASE UPDATE ERROR", error);
+      const message =
+        error instanceof Error ? error.message : "Unknown save error";
+      toast.error(`Could not save profile: ${message}`);
+    } finally {
+      console.log("LOADING FALSE");
+      setSavingProfile(false);
     }
   };
 
