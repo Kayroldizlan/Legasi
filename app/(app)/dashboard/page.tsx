@@ -66,9 +66,14 @@ export default async function DashboardPage() {
         <div className="flex items-center gap-4">
           <Avatar src={profile.avatar_url} name={profile.full_name} size={56} ring />
           <div>
-            <p className="text-xs text-ink-subtle">Welcome back,</p>
+            <p className="text-xs uppercase tracking-wider text-ink-subtle">
+              Dashboard
+            </p>
             <h1 className="text-2xl font-semibold tracking-tight">
-              {profile.full_name.split(" ")[0]}
+              Welcome back, {profile.full_name.split(" ")[0]}!{" "}
+              <span className="inline-block" aria-hidden>
+                👋
+              </span>
             </h1>
           </div>
         </div>

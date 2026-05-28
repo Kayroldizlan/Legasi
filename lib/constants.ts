@@ -27,7 +27,7 @@ export const RELATION_META: Record<
   spouse:           { label: "Spouse",           color: "#db2777", group: "family" },
   business_partner: { label: "Business Partner", color: "#d97706", group: "work" },
   employee:         { label: "Employee",         color: "#16a34a", group: "work" },
-  manager:          { label: "Manager",          color: "#dc2626", group: "work" },
+  manager:          { label: "Manager",          color: "#f97316", group: "work" },
   friend:           { label: "Friend",           color: "#10b981", group: "social" },
   mentor:           { label: "Mentor",           color: "#8b5cf6", group: "social" },
 };

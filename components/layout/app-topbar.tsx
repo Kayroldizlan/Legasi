@@ -44,7 +44,7 @@ export function AppTopbar({ title }: { title?: string }) {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search the directory…"
+            placeholder="Search people, jobs, companies…"
             className="input-base pl-10"
           />
         </div>
