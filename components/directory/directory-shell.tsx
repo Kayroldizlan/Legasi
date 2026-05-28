@@ -1,17 +1,7 @@
 "use client";
 
-import { Sidebar } from "@/components/layout/sidebar";
-
-import { DirectoryTopbar } from "./directory-topbar";
+import { AppShell } from "@/components/layout/app-shell";
 
 export function DirectoryShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen bg-surface-muted">
-      <Sidebar variant="user" />
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden">
-        <DirectoryTopbar />
-        <main className="flex-1">{children}</main>
-      </div>
-    </div>
-  );
+  return <AppShell>{children}</AppShell>;
 }

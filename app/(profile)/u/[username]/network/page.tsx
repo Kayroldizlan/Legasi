@@ -28,8 +28,8 @@ export default async function NetworkPage({ params }: PageProps) {
   const { profiles, relations } = await expandNetwork(supabase, root.id, 2);
 
   return (
-    <div className="bg-surface-muted">
-      <div className="container py-8 lg:py-10 space-y-6">
+    <div className="bg-zinc-50">
+      <div className="space-y-6 px-4 py-8 lg:px-8 lg:py-10">
         <header className="flex flex-col sm:flex-row sm:items-end gap-3 justify-between">
           <div>
             <Link
