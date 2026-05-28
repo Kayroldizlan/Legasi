@@ -1,8 +1,8 @@
 /**
- * Builds logo mark and horizontal logo PNGs from public/logo-source.png.
+ * Prepares the transparent lion mark from public/logo-source.png.
  * Run: node scripts/generate-logo.mjs
  */
-import { access, writeFile } from "node:fs/promises";
+import { access } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
@@ -11,21 +11,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const sourcePath = join(root, "public", "logo-source.png");
 const markPath = join(root, "public", "logo-mark.png");
-const wordmark = "The Legasi";
 
-const MARK_SIZE = 36;
-const GAP = 10;
-const TEXT_COLOR = "#0f172a";
-const TEXT_COLOR_INVERTED = "#ffffff";
-const FONT = "Inter, Arial, Helvetica, sans-serif";
-const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
-
-function isBackgroundPixel(r, g, b) {
+function isBlackPixel(r, g, b) {
   return r < 80 && g < 80 && b < 80;
 }
 
-/** Flood-fill outer black background from image edges; keeps true transparency. */
-function removeOuterBackground(data, width, height) {
+function isWhitePixel(r, g, b) {
+  return r > 240 && g > 240 && b > 240;
+}
+
+/** Flood-fill a background color connected to the image edges. */
+function floodFillEdges(data, width, height, matches) {
   const visited = new Uint8Array(width * height);
   const queue = [];
 
@@ -35,9 +31,7 @@ function removeOuterBackground(data, width, height) {
     if (visited[idx]) return;
 
     const offset = idx * 4;
-    if (!isBackgroundPixel(data[offset], data[offset + 1], data[offset + 2])) {
-      return;
-    }
+    if (!matches(data[offset], data[offset + 1], data[offset + 2])) return;
 
     visited[idx] = 1;
     queue.push(idx);
@@ -56,8 +50,7 @@ function removeOuterBackground(data, width, height) {
     const idx = queue.pop();
     if (idx === undefined) break;
 
-    const offset = idx * 4;
-    data[offset + 3] = 0;
+    data[idx * 4 + 3] = 0;
 
     const x = idx % width;
     const y = Math.floor(idx / width);
@@ -68,93 +61,40 @@ function removeOuterBackground(data, width, height) {
   }
 }
 
-async function prepareMark() {
+/** Make black/white backgrounds transparent so the mark works on any theme. */
+function makeTransparent(data) {
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    // Tribal negative space + black matte
+    if (isBlackPixel(r, g, b)) {
+      data[i + 3] = 0;
+    }
+  }
+}
+
+async function main() {
+  await access(sourcePath);
+
   const { data, info } = await sharp(sourcePath)
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  removeOuterBackground(data, info.width, info.height);
+  makeTransparent(data);
+  floodFillEdges(data, info.width, info.height, isWhitePixel);
+  floodFillEdges(data, info.width, info.height, isBlackPixel);
 
   await sharp(data, {
     raw: { width: info.width, height: info.height, channels: 4 },
   })
     .trim({ threshold: 12 })
-    .png()
+    .png({ compressionLevel: 9, adaptiveFiltering: true })
     .toFile(markPath);
 
   console.log("  ✓ public/logo-mark.png");
-}
-
-function wordmarkSvg(color) {
-  const escaped = wordmark
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  return Buffer.from(`<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="160" height="${MARK_SIZE}">
-  <text
-    x="0"
-    y="24"
-    fill="${color}"
-    font-family="${FONT}"
-    font-size="16"
-    font-weight="600"
-    letter-spacing="-0.02em"
-  >${escaped}</text>
-</svg>`);
-}
-
-async function buildLogo({ color, outName }) {
-  const mark = await sharp(markPath)
-    .resize(MARK_SIZE, MARK_SIZE, { fit: "contain", background: TRANSPARENT })
-    .png()
-    .toBuffer();
-
-  const textTrimmed = await sharp(wordmarkSvg(color))
-    .resize(160, MARK_SIZE, { fit: "contain", background: TRANSPARENT })
-    .trim({ threshold: 40 })
-    .png()
-    .toBuffer();
-
-  const { width: textWidth, height: textHeight } = await sharp(textTrimmed).metadata();
-
-  const width = MARK_SIZE + GAP + (textWidth ?? 120);
-  const height = Math.max(MARK_SIZE, textHeight ?? MARK_SIZE);
-  const textTop = Math.round((height - (textHeight ?? MARK_SIZE)) / 2);
-  const markTop = Math.round((height - MARK_SIZE) / 2);
-
-  await sharp({
-    create: {
-      width,
-      height,
-      channels: 4,
-      background: TRANSPARENT,
-    },
-  })
-    .composite([
-      { input: mark, left: 0, top: markTop },
-      { input: textTrimmed, left: MARK_SIZE + GAP, top: textTop },
-    ])
-    .png()
-    .toFile(join(root, "public", outName));
-
-  console.log(`  ✓ public/${outName} (${width}x${height})`);
-  return { width, height };
-}
-
-async function main() {
-  await access(sourcePath);
-  await prepareMark();
-
-  const full = await buildLogo({ color: TEXT_COLOR, outName: "logo.png" });
-  await buildLogo({ color: TEXT_COLOR_INVERTED, outName: "logo-inverted.png" });
-
-  await writeFile(
-    join(root, "public", "logo.meta.json"),
-    `${JSON.stringify(full, null, 2)}\n`,
-  );
-  console.log("  ✓ public/logo.meta.json");
 }
 
 main().catch((err) => {
