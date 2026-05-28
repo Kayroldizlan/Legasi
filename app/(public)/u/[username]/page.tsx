@@ -8,6 +8,7 @@ import {
   Users as UsersIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -77,18 +78,18 @@ export default async function PublicProfilePage({ params }: PageProps) {
 
       <main className="flex-1 bg-surface-muted">
         <div className="relative">
-          <div
-            className="h-44 sm:h-60 w-full bg-gradient-to-br from-brand-500 to-brand-800"
-            style={
-              profile.cover_url
-                ? {
-                    backgroundImage: `url(${profile.cover_url})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }
-                : undefined
-            }
-          />
+          <div className="relative h-44 sm:h-60 w-full overflow-hidden bg-gradient-to-br from-brand-500 to-brand-800">
+            {profile.cover_url && (
+              <Image
+                src={profile.cover_url}
+                alt={`${profile.full_name} cover`}
+                fill
+                sizes="100vw"
+                className="object-cover"
+                priority
+              />
+            )}
+          </div>
         </div>
 
         <div className="container -mt-16 sm:-mt-20 grid gap-6 lg:grid-cols-[2fr_3fr] pb-12">

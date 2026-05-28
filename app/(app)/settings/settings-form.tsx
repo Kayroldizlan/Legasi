@@ -1,12 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Camera } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
+import { ImageDropzone } from "@/components/profile/image-dropzone";
 import {
   Avatar,
   Button,
@@ -18,6 +19,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { compressAvatar, compressCover } from "@/lib/upload-image";
 import {
   profileSchema,
   socialLinksSchema,
@@ -76,31 +78,77 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
     field: "avatar_url" | "cover_url",
     bucket: "avatars" | "covers",
   ) => {
-    const ext = file.name.split(".").pop() || "png";
-    const path = `${profile.id}/${field}-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from(bucket).upload(path, file, {
-      upsert: true,
-      cacheControl: "3600",
-    });
-    if (error) {
-      toast.error(error.message);
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
       return;
     }
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from(bucket).getPublicUrl(path);
 
-    const { error: upErr } = await supabase
-      .from("profiles")
-      .update({ [field]: publicUrl } as never)
-      .eq("id", profile.id);
-    if (upErr) return toast.error(upErr.message);
+    const toastId = toast.loading(
+      field === "avatar_url" ? "Optimizing avatar…" : "Optimizing cover…",
+    );
 
-    if (field === "avatar_url") setAvatarUrl(publicUrl);
-    else setCoverUrl(publicUrl);
-    patchProfile({ [field]: publicUrl } as Partial<Profile>);
-    toast.success("Image updated");
-    router.refresh();
+    try {
+      // Client-side compress + convert to WebP before upload.
+      const optimized =
+        field === "avatar_url"
+          ? await compressAvatar(file)
+          : await compressCover(file);
+
+      toast.loading("Uploading…", { id: toastId });
+
+      const path = `${profile.id}/${field}-${Date.now()}.webp`;
+      const { error: uploadErr } = await supabase.storage
+        .from(bucket)
+        .upload(path, optimized, {
+          upsert: true,
+          cacheControl: "3600",
+          contentType: "image/webp",
+        });
+      if (uploadErr) throw uploadErr;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from(bucket).getPublicUrl(path);
+
+      const { error: dbErr } = await supabase
+        .from("profiles")
+        .update({ [field]: publicUrl } as never)
+        .eq("id", profile.id);
+      if (dbErr) throw dbErr;
+
+      if (field === "avatar_url") setAvatarUrl(publicUrl);
+      else setCoverUrl(publicUrl);
+      patchProfile({ [field]: publicUrl } as Partial<Profile>);
+
+      toast.success("Image updated", { id: toastId });
+      router.refresh();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not update image.";
+      toast.error(message, { id: toastId });
+    }
+  };
+
+  const removeImage = async (field: "avatar_url" | "cover_url") => {
+    const toastId = toast.loading("Removing…");
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ [field]: null } as never)
+        .eq("id", profile.id);
+      if (error) throw error;
+
+      if (field === "avatar_url") setAvatarUrl(null);
+      else setCoverUrl(null);
+      patchProfile({ [field]: null } as Partial<Profile>);
+
+      toast.success("Image removed", { id: toastId });
+      router.refresh();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not remove image.";
+      toast.error(message, { id: toastId });
+    }
   };
 
   const onSubmitProfile = async (values: ProfileInput) => {
@@ -149,38 +197,40 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden p-0">
-        <div
-          className="h-36 sm:h-44 w-full bg-gradient-to-br from-brand-500 to-brand-700 relative"
-          style={
-            coverUrl
-              ? {
-                  backgroundImage: `url(${coverUrl})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }
-              : undefined
-          }
+        <ImageDropzone
+          shape="rect"
+          hasImage={Boolean(coverUrl)}
+          changeLabel="Change cover"
+          emptyHint="Drop a cover image here"
+          onUpload={(f) => uploadImage(f, "cover_url", "covers")}
+          onRemove={coverUrl ? () => removeImage("cover_url") : undefined}
+          className="h-36 sm:h-44 w-full overflow-hidden bg-gradient-to-br from-brand-500 to-brand-700 !rounded-none"
+          actionsClassName="right-4 top-4"
         >
-          <ImageUploadButton
-            onChange={async (f) => {
-              await uploadImage(f, "cover_url", "covers");
-            }}
-            label="Change cover"
-            className="absolute right-4 top-4"
-          />
-        </div>
-        <div className="px-6 pb-6 -mt-12 flex items-end gap-4">
-          <div className="relative">
-            <Avatar src={avatarUrl} name={profile.full_name} size={88} ring />
-            <ImageUploadButton
-              onChange={async (f) => {
-                await uploadImage(f, "avatar_url", "avatars");
-              }}
-              label="Change"
-              className="absolute -bottom-1 -right-1"
-              compact
+          {coverUrl && (
+            <Image
+              src={coverUrl}
+              alt="Cover image"
+              fill
+              sizes="(min-width: 768px) 56rem, 100vw"
+              className="object-cover"
+              priority
             />
-          </div>
+          )}
+        </ImageDropzone>
+        <div className="px-6 pb-6 -mt-12 flex items-end gap-4">
+          <ImageDropzone
+            shape="circle"
+            compact
+            hasImage={Boolean(avatarUrl)}
+            changeLabel="Change avatar"
+            onUpload={(f) => uploadImage(f, "avatar_url", "avatars")}
+            onRemove={avatarUrl ? () => removeImage("avatar_url") : undefined}
+            className="shrink-0"
+            actionsClassName="-bottom-1 -right-1"
+          >
+            <Avatar src={avatarUrl} name={profile.full_name} size={88} ring />
+          </ImageDropzone>
           <div>
             <p className="text-lg font-semibold">{profile.full_name}</p>
             <p className="text-xs text-ink-subtle">@{profile.username}</p>
@@ -234,52 +284,5 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
         </form>
       </Card>
     </div>
-  );
-}
-
-function ImageUploadButton({
-  onChange,
-  label,
-  className,
-  compact,
-}: {
-  onChange: (file: File) => Promise<void>;
-  label: string;
-  className?: string;
-  compact?: boolean;
-}) {
-  const inputRef = React.useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = React.useState(false);
-
-  const handle = async (file?: File) => {
-    if (!file) return;
-    setBusy(true);
-    await onChange(file);
-    setBusy(false);
-  };
-
-  return (
-    <>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => handle(e.target.files?.[0])}
-      />
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={busy}
-        className={`inline-flex items-center gap-1.5 rounded-full bg-surface/95 border border-border px-3 py-1.5 text-xs font-medium shadow-soft hover:bg-surface ${
-          compact ? "h-8 w-8 p-0 justify-center" : ""
-        } ${className ?? ""}`}
-        aria-label={label}
-        title={label}
-      >
-        <Camera className="h-3.5 w-3.5" />
-        {!compact && (busy ? "Uploading…" : label)}
-      </button>
-    </>
   );
 }

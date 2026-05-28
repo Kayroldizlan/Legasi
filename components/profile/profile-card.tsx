@@ -1,4 +1,5 @@
 import { Building2, CheckCircle2, MapPin } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 import { Avatar, Badge } from "@/components/ui";
@@ -68,18 +69,19 @@ export function ProfileCard({ profile, variant = "grid" }: ProfileCardProps) {
       href={href}
       className="card relative overflow-hidden p-0 hover:shadow-elevated hover:-translate-y-0.5 transition"
     >
-      <div
-        className="h-20 w-full bg-gradient-to-br from-brand-500 to-brand-700"
-        style={
-          profile.cover_url
-            ? {
-                backgroundImage: `url(${profile.cover_url})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }
-            : undefined
-        }
-      />
+      <div className="relative h-20 w-full overflow-hidden bg-gradient-to-br from-brand-500 to-brand-700">
+        {profile.cover_url && (
+          <Image
+            src={profile.cover_url}
+            alt=""
+            aria-hidden
+            fill
+            sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            className="object-cover"
+            loading="lazy"
+          />
+        )}
+      </div>
       <div className="px-5 pb-5 -mt-8">
         <Avatar
           src={profile.avatar_url}
