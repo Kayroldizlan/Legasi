@@ -83,19 +83,33 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       return;
     }
 
-    const toastId = toast.loading(
-      field === "avatar_url" ? "Optimizing avatar…" : "Optimizing cover…",
-    );
+    const label = field === "avatar_url" ? "avatar" : "cover";
+    const toastId = toast.loading(`Optimizing ${label}…`);
+    const previousUrl = field === "avatar_url" ? avatarUrl : coverUrl;
+    let optimisticUrl: string | null = null;
 
     try {
-      // Client-side compress + convert to WebP before upload.
-      const optimized =
-        field === "avatar_url"
-          ? await compressAvatar(file)
-          : await compressCover(file);
+      // 1) Compress in a web worker (single pass) — fast, with live progress.
+      const compress =
+        field === "avatar_url" ? compressAvatar : compressCover;
+      const optimized = await compress(file, (percent) => {
+        if (percent < 100) {
+          toast.loading(`Optimizing ${label}… ${Math.round(percent)}%`, {
+            id: toastId,
+          });
+        }
+      });
 
-      toast.loading("Uploading…", { id: toastId });
+      // 2) Optimistic local preview — user sees the new image instantly,
+      //    while the network upload + DB write run in the background.
+      optimisticUrl = URL.createObjectURL(optimized);
+      if (field === "avatar_url") setAvatarUrl(optimisticUrl);
+      else setCoverUrl(optimisticUrl);
+      patchProfile({ [field]: optimisticUrl } as Partial<Profile>);
 
+      toast.loading(`Uploading ${label}…`, { id: toastId });
+
+      // 3) Upload + DB update.
       const path = `${profile.id}/${field}-${Date.now()}.webp`;
       const { error: uploadErr } = await supabase.storage
         .from(bucket)
@@ -116,21 +130,43 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
         .eq("id", profile.id);
       if (dbErr) throw dbErr;
 
+      // 4) Swap optimistic blob URL → public CDN URL.
       if (field === "avatar_url") setAvatarUrl(publicUrl);
       else setCoverUrl(publicUrl);
       patchProfile({ [field]: publicUrl } as Partial<Profile>);
 
       toast.success("Image updated", { id: toastId });
-      router.refresh();
+      // NOTE: deliberately no router.refresh() — local state + zustand are
+      // already updated and a full Server Component re-render would just add
+      // 300–800 ms of perceived latency for no visible change.
     } catch (err) {
+      // Roll back the optimistic preview so the user doesn't think it worked.
+      if (field === "avatar_url") setAvatarUrl(previousUrl);
+      else setCoverUrl(previousUrl);
+      patchProfile({ [field]: previousUrl } as Partial<Profile>);
+
       const message =
         err instanceof Error ? err.message : "Could not update image.";
       toast.error(message, { id: toastId });
+    } finally {
+      // Defer the blob URL revoke so any in-flight <Image> render that picked
+      // it up can finish before the browser invalidates the handle.
+      if (optimisticUrl) {
+        const url = optimisticUrl;
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+      }
     }
   };
 
   const removeImage = async (field: "avatar_url" | "cover_url") => {
     const toastId = toast.loading("Removing…");
+    const previousUrl = field === "avatar_url" ? avatarUrl : coverUrl;
+
+    // Optimistic clear so the UI updates instantly.
+    if (field === "avatar_url") setAvatarUrl(null);
+    else setCoverUrl(null);
+    patchProfile({ [field]: null } as Partial<Profile>);
+
     try {
       const { error } = await supabase
         .from("profiles")
@@ -138,13 +174,13 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
         .eq("id", profile.id);
       if (error) throw error;
 
-      if (field === "avatar_url") setAvatarUrl(null);
-      else setCoverUrl(null);
-      patchProfile({ [field]: null } as Partial<Profile>);
-
       toast.success("Image removed", { id: toastId });
-      router.refresh();
     } catch (err) {
+      // Roll back the optimistic clear.
+      if (field === "avatar_url") setAvatarUrl(previousUrl);
+      else setCoverUrl(previousUrl);
+      patchProfile({ [field]: previousUrl } as Partial<Profile>);
+
       const message =
         err instanceof Error ? err.message : "Could not remove image.";
       toast.error(message, { id: toastId });
