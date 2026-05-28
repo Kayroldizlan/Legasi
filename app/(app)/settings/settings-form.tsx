@@ -9,12 +9,15 @@ import toast from "react-hot-toast";
 import {
   removeProfileImageAction,
   updateProfileAction,
+  updateProfileImagePositionAction,
   updateSocialLinksAction,
   uploadProfileImageAction,
   type ProfileImageField,
+  type ProfileImagePositionTarget,
 } from "@/lib/actions/profile";
 import { withActionTimeout } from "@/lib/client/with-action-timeout";
 import { ImageDropzone } from "@/components/profile/image-dropzone";
+import { ImagePositionEditor } from "@/components/profile/image-position-editor";
 import {
   Avatar,
   Button,
@@ -33,6 +36,12 @@ import {
   type SocialPlatformKey,
 } from "@/lib/social-platforms";
 import { compressAvatar, compressCover } from "@/lib/upload-image";
+import {
+  DEFAULT_PROFILE_IMAGE_POSITION,
+  formatObjectPosition,
+  getAvatarPosition,
+  getCoverPosition,
+} from "@/lib/profile-image-position";
 import {
   normalizeProfileInput,
   PROFILE_BIO_MAX_LENGTH,
@@ -123,6 +132,14 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   const [savingSocials, setSavingSocials] = React.useState(false);
   const [avatarUrl, setAvatarUrl] = React.useState(profile.avatar_url);
   const [coverUrl, setCoverUrl] = React.useState(profile.cover_url);
+  const [avatarPosition, setAvatarPosition] = React.useState(() =>
+    getAvatarPosition(profile),
+  );
+  const [coverPosition, setCoverPosition] = React.useState(() =>
+    getCoverPosition(profile),
+  );
+  const lastSavedAvatarPosition = React.useRef(getAvatarPosition(profile));
+  const lastSavedCoverPosition = React.useRef(getCoverPosition(profile));
 
   const profileForm = useForm<ProfileInput>({
     resolver: zodResolver(profileSchema),
@@ -141,6 +158,80 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       profileForm.reset(profileToFormValues(snapshot));
     },
     [patchProfile, profileForm],
+  );
+
+  const resetImagePosition = React.useCallback(
+    (target: ProfileImagePositionTarget) => {
+      const next = {
+        x: DEFAULT_PROFILE_IMAGE_POSITION,
+        y: DEFAULT_PROFILE_IMAGE_POSITION,
+      };
+      if (target === "avatar") {
+        setAvatarPosition(next);
+        lastSavedAvatarPosition.current = next;
+        patchProfile({
+          avatar_position_x: next.x,
+          avatar_position_y: next.y,
+        });
+        return;
+      }
+      setCoverPosition(next);
+      lastSavedCoverPosition.current = next;
+      patchProfile({
+        cover_position_x: next.x,
+        cover_position_y: next.y,
+      });
+    },
+    [patchProfile],
+  );
+
+  const saveImagePosition = React.useCallback(
+    async (target: ProfileImagePositionTarget, x: number, y: number) => {
+      const previous =
+        target === "avatar"
+          ? lastSavedAvatarPosition.current
+          : lastSavedCoverPosition.current;
+
+      const patch =
+        target === "avatar"
+          ? { avatar_position_x: x, avatar_position_y: y }
+          : { cover_position_x: x, cover_position_y: y };
+
+      patchProfile(patch);
+
+      const result = await withActionTimeout(
+        updateProfileImagePositionAction(target, x, y),
+        ACTION_TIMEOUT_MS,
+      );
+
+      if (result.success) {
+        if (target === "avatar") {
+          lastSavedAvatarPosition.current = { x, y };
+        } else {
+          lastSavedCoverPosition.current = { x, y };
+        }
+        return;
+      }
+
+      if (target === "avatar") {
+        setAvatarPosition(previous);
+      } else {
+        setCoverPosition(previous);
+      }
+      patchProfile({
+        ...(target === "avatar"
+          ? {
+              avatar_position_x: previous.x,
+              avatar_position_y: previous.y,
+            }
+          : {
+              cover_position_x: previous.x,
+              cover_position_y: previous.y,
+            }),
+      });
+      toast.error(result.error || "Could not save image position.");
+    },
+    [patchProfile],
   );
 
   const uploadImage = async (
@@ -190,6 +281,7 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       if (field === "avatar_url") setAvatarUrl(result.data.publicUrl);
       else setCoverUrl(result.data.publicUrl);
       patchProfile({ [field]: result.data.publicUrl } as Partial<Profile>);
+      resetImagePosition(field === "avatar_url" ? "avatar" : "cover");
 
       toast.success(
         field === "avatar_url" ? "Avatar updated" : "Cover updated",
@@ -217,6 +309,7 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
     if (field === "avatar_url") setAvatarUrl(null);
     else setCoverUrl(null);
     patchProfile({ [field]: null } as Partial<Profile>);
+    resetImagePosition(field === "avatar_url" ? "avatar" : "cover");
 
     const result = await withActionTimeout(
       removeProfileImageAction(field),
@@ -327,14 +420,37 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
           actionsClassName="right-4 top-4"
         >
           {coverUrl && (
-            <Image
-              src={coverUrl}
-              alt="Cover image"
-              fill
-              sizes="(min-width: 768px) 56rem, 100vw"
-              className="object-cover"
-              priority
-            />
+            <ImagePositionEditor
+              editable
+              shape="rect"
+              className="absolute inset-0"
+              positionX={coverPosition.x}
+              positionY={coverPosition.y}
+              onPositionChange={(x, y) => {
+                setCoverPosition({ x, y });
+                patchProfile({
+                  cover_position_x: x,
+                  cover_position_y: y,
+                });
+              }}
+              onPositionCommit={(x, y) => void saveImagePosition("cover", x, y)}
+            >
+              <Image
+                src={coverUrl}
+                alt="Cover image"
+                fill
+                sizes="(min-width: 768px) 56rem, 100vw"
+                className="object-cover"
+                style={{
+                  objectPosition: formatObjectPosition(
+                    coverPosition.x,
+                    coverPosition.y,
+                  ),
+                }}
+                priority
+                draggable={false}
+              />
+            </ImagePositionEditor>
           )}
         </ImageDropzone>
         <div className="px-6 pb-6 -mt-12 flex items-end gap-4">
@@ -348,7 +464,29 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
             className="shrink-0"
             actionsClassName="-bottom-1 -right-1"
           >
-            <Avatar src={avatarUrl} name={profile.full_name} size={88} ring />
+            <ImagePositionEditor
+              editable={Boolean(avatarUrl)}
+              shape="circle"
+              positionX={avatarPosition.x}
+              positionY={avatarPosition.y}
+              onPositionChange={(x, y) => {
+                setAvatarPosition({ x, y });
+                patchProfile({
+                  avatar_position_x: x,
+                  avatar_position_y: y,
+                });
+              }}
+              onPositionCommit={(x, y) => void saveImagePosition("avatar", x, y)}
+            >
+              <Avatar
+                src={avatarUrl}
+                name={profile.full_name}
+                size={88}
+                ring
+                objectPositionX={avatarPosition.x}
+                objectPositionY={avatarPosition.y}
+              />
+            </ImagePositionEditor>
           </ImageDropzone>
           <div>
             <p className="text-lg font-semibold">{profile.full_name}</p>

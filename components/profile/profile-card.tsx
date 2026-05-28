@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { Avatar, Badge } from "@/components/ui";
+import { formatObjectPosition } from "@/lib/profile-image-position";
 import { buildProfileUrl } from "@/lib/utils";
 
 import type { Profile } from "@/types/database";
@@ -27,6 +28,8 @@ export function ProfileCard({ profile, variant = "grid" }: ProfileCardProps) {
           name={profile.full_name}
           size={56}
           online={profile.is_online}
+          objectPositionX={profile.avatar_position_x}
+          objectPositionY={profile.avatar_position_y}
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -78,6 +81,12 @@ export function ProfileCard({ profile, variant = "grid" }: ProfileCardProps) {
             fill
             sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
             className="object-cover"
+            style={{
+              objectPosition: formatObjectPosition(
+                profile.cover_position_x,
+                profile.cover_position_y,
+              ),
+            }}
             loading="lazy"
           />
         )}
@@ -89,6 +98,8 @@ export function ProfileCard({ profile, variant = "grid" }: ProfileCardProps) {
           size={64}
           ring
           online={profile.is_online}
+          objectPositionX={profile.avatar_position_x}
+          objectPositionY={profile.avatar_position_y}
         />
         <div className="mt-3">
           <p className="flex items-center gap-1.5 font-semibold text-ink truncate">

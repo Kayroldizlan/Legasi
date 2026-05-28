@@ -4,6 +4,7 @@ import Image from "next/image";
 import * as React from "react";
 
 import { cn, colorFromString, getInitials } from "@/lib/utils";
+import { formatObjectPosition } from "@/lib/profile-image-position";
 
 interface AvatarProps {
   src?: string | null;
@@ -12,6 +13,8 @@ interface AvatarProps {
   className?: string;
   ring?: boolean;
   online?: boolean;
+  objectPositionX?: number | null;
+  objectPositionY?: number | null;
 }
 
 export function Avatar({
@@ -21,6 +24,8 @@ export function Avatar({
   className,
   ring,
   online,
+  objectPositionX,
+  objectPositionY,
 }: AvatarProps) {
   const [errored, setErrored] = React.useState(false);
   const initials = getInitials(name);
@@ -48,6 +53,9 @@ export function Avatar({
           width={size}
           height={size}
           className="h-full w-full object-cover"
+          style={{
+            objectPosition: formatObjectPosition(objectPositionX, objectPositionY),
+          }}
           onError={() => setErrored(true)}
           unoptimized={src.startsWith("data:")}
         />

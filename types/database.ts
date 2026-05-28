@@ -32,6 +32,10 @@ export interface Profile {
   phone: string | null;
   avatar_url: string | null;
   cover_url: string | null;
+  avatar_position_x: number;
+  avatar_position_y: number;
+  cover_position_x: number;
+  cover_position_y: number;
   occupation: string | null;
   company: string | null;
   bio: string | null;

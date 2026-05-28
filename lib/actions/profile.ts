@@ -20,9 +20,14 @@ import {
   type ProfileInput,
   type SocialLinksInput,
 } from "@/lib/validations";
+import {
+  clampProfileImagePosition,
+  DEFAULT_PROFILE_IMAGE_POSITION,
+} from "@/lib/profile-image-position";
 
 const IMAGE_FIELDS = ["avatar_url", "cover_url"] as const;
 export type ProfileImageField = (typeof IMAGE_FIELDS)[number];
+export type ProfileImagePositionTarget = "avatar" | "cover";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -148,7 +153,18 @@ export async function uploadProfileImageAction(
 
   const { error: dbError } = await supabase
     .from("profiles")
-    .update({ [field]: publicUrl } as never)
+    .update({
+      [field]: publicUrl,
+      ...(field === "avatar_url"
+        ? {
+            avatar_position_x: DEFAULT_PROFILE_IMAGE_POSITION,
+            avatar_position_y: DEFAULT_PROFILE_IMAGE_POSITION,
+          }
+        : {
+            cover_position_x: DEFAULT_PROFILE_IMAGE_POSITION,
+            cover_position_y: DEFAULT_PROFILE_IMAGE_POSITION,
+          }),
+    } as never)
     .eq("id", user.id);
 
   if (dbError) {
@@ -171,7 +187,56 @@ export async function removeProfileImageAction(
 
   const { error } = await supabase
     .from("profiles")
-    .update({ [field]: null } as never)
+    .update({
+      [field]: null,
+      ...(field === "avatar_url"
+        ? {
+            avatar_position_x: DEFAULT_PROFILE_IMAGE_POSITION,
+            avatar_position_y: DEFAULT_PROFILE_IMAGE_POSITION,
+          }
+        : {
+            cover_position_x: DEFAULT_PROFILE_IMAGE_POSITION,
+            cover_position_y: DEFAULT_PROFILE_IMAGE_POSITION,
+          }),
+    } as never)
+    .eq("id", user.id);
+
+  if (error) {
+    return actionFailure(mapPostgrestError(error, "profile"));
+  }
+
+  return actionSuccess(undefined);
+}
+
+/** Persist avatar or cover focal point (CSS object-position percentages). */
+export async function updateProfileImagePositionAction(
+  target: ProfileImagePositionTarget,
+  x: number,
+  y: number,
+): Promise<ActionResult> {
+  if (target !== "avatar" && target !== "cover") {
+    return actionFailure("Invalid image target.");
+  }
+
+  const { supabase, user, error: authError } = await requireUser();
+  if (!user) return actionFailure(authError!);
+
+  const positionX = clampProfileImagePosition(x);
+  const positionY = clampProfileImagePosition(y);
+  const update =
+    target === "avatar"
+      ? {
+          avatar_position_x: positionX,
+          avatar_position_y: positionY,
+        }
+      : {
+          cover_position_x: positionX,
+          cover_position_y: positionY,
+        };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update(update as never)
     .eq("id", user.id);
 
   if (error) {

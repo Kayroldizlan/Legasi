@@ -21,6 +21,7 @@ import { ProfileShareCard } from "@/components/profile/profile-share-card";
 import { ProfileTabs } from "@/components/profile/profile-tabs";
 import { SocialIcons } from "@/components/profile/social-icons";
 import { Avatar, EmptyState } from "@/components/ui";
+import { formatObjectPosition } from "@/lib/profile-image-position";
 import { createClient } from "@/lib/supabase/server";
 import {
   absoluteUrl,
@@ -307,6 +308,12 @@ export default async function PublicProfilePage({ params }: PageProps) {
               fill
               sizes="100vw"
               className="object-cover"
+              style={{
+                objectPosition: formatObjectPosition(
+                  profile.cover_position_x,
+                  profile.cover_position_y,
+                ),
+              }}
               priority
             />
           ) : (
@@ -337,6 +344,8 @@ export default async function PublicProfilePage({ params }: PageProps) {
                   size={120}
                   ring
                   online={profile.is_online}
+                  objectPositionX={profile.avatar_position_x}
+                  objectPositionY={profile.avatar_position_y}
                   className="!ring-4 !ring-surface"
                 />
                 <div className="sm:pb-2">

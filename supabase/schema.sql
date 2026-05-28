@@ -52,6 +52,10 @@ create table if not exists public.profiles (
   phone           text,
   avatar_url      text,
   cover_url       text,
+  avatar_position_x smallint not null default 50 check (avatar_position_x between 0 and 100),
+  avatar_position_y smallint not null default 50 check (avatar_position_y between 0 and 100),
+  cover_position_x  smallint not null default 50 check (cover_position_x between 0 and 100),
+  cover_position_y  smallint not null default 50 check (cover_position_y between 0 and 100),
   occupation      text,
   company         text,
   bio             text,
@@ -554,3 +558,9 @@ create policy "storage: owner delete"
 -- Bootstrap your first admin (replace email)
 -- ============================================================================
 -- update public.profiles set role = 'admin' where email = 'you@example.com';
+
+-- Profile image focal point (0–100%, maps to CSS object-position)
+alter table public.profiles add column if not exists avatar_position_x smallint not null default 50 check (avatar_position_x between 0 and 100);
+alter table public.profiles add column if not exists avatar_position_y smallint not null default 50 check (avatar_position_y between 0 and 100);
+alter table public.profiles add column if not exists cover_position_x smallint not null default 50 check (cover_position_x between 0 and 100);
+alter table public.profiles add column if not exists cover_position_y smallint not null default 50 check (cover_position_y between 0 and 100);
