@@ -445,7 +445,13 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
             <Textarea label="Bio" rows={4} {...profileForm.register("bio")} error={profileForm.formState.errors.bio?.message} />
           </div>
           <div className="sm:col-span-2 flex justify-end">
-            <Button type="submit" loading={savingProfile}>Save changes</Button>
+            <Button
+              type="submit"
+              disabled={savingProfile}
+              loading={savingProfile}
+            >
+              {savingProfile ? "Saving…" : "Save changes"}
+            </Button>
           </div>
         </form>
       </Card>
