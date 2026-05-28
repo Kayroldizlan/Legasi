@@ -11,6 +11,7 @@ import {
 import { NotificationPreferencesForm } from "@/components/notifications/notification-preferences-form";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_NOTIFICATION_TYPE_SETTINGS } from "@/lib/notifications/constants";
+import { listMyConnections } from "@/services/connections";
 import { listRelations } from "@/services/relations";
 import { getNotificationPreferences } from "@/services/notifications";
 
@@ -39,6 +40,10 @@ export default async function SettingsPage() {
     .maybeSingle();
 
   const relations = await listRelations(supabase, user.id);
+  const connections = await listMyConnections(supabase, user.id);
+  const connectionProfiles = connections
+    .filter((c) => c.status === "accepted")
+    .map((c) => (c.requester_id === user.id ? c.addressee : c.requester));
   const notificationPrefs = await getNotificationPreferences(supabase, user.id);
 
   if (!profile) redirect("/");
@@ -100,7 +105,10 @@ export default async function SettingsPage() {
           title="Relationships"
           description="Add the people connected to you so the network graph reflects real life."
         >
-          <RelationsManager initial={relations} userId={user.id} />
+          <RelationsManager
+            initial={relations}
+            connectionProfiles={connectionProfiles}
+          />
         </PageSection>
       </PageContent>
     </>

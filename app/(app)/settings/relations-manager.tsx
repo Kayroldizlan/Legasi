@@ -1,7 +1,6 @@
 "use client";
 
 import { Plus, Search, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import * as React from "react";
 import toast from "react-hot-toast";
 
@@ -13,8 +12,11 @@ import {
   Input,
   Select,
 } from "@/components/ui";
+import {
+  addRelationAction,
+  removeRelationAction,
+} from "@/lib/actions/relations";
 import { RELATION_META, RELATION_TYPES } from "@/lib/constants";
-import { createClient } from "@/lib/supabase/client";
 
 import type {
   Profile,
@@ -23,73 +25,73 @@ import type {
 } from "@/types/database";
 
 interface Props {
-  userId: string;
   initial: RelationWithProfile[];
+  connectionProfiles: Profile[];
 }
 
-export function RelationsManager({ userId, initial }: Props) {
-  const router = useRouter();
-  const supabase = createClient();
+export function RelationsManager({
+  initial,
+  connectionProfiles,
+}: Props) {
   const [items, setItems] = React.useState(initial);
   const [search, setSearch] = React.useState("");
   const [results, setResults] = React.useState<Profile[]>([]);
   const [selected, setSelected] = React.useState<Profile | null>(null);
   const [relationType, setRelationType] = React.useState<RelationType>("friend");
   const [busy, setBusy] = React.useState(false);
+  const [dropdownOpen, setDropdownOpen] = React.useState(false);
+
+  const availableConnections = React.useMemo(() => {
+    const relatedIds = new Set(items.map((r) => r.related_user_id));
+    return connectionProfiles.filter((p) => !relatedIds.has(p.id));
+  }, [connectionProfiles, items]);
 
   React.useEffect(() => {
-    const q = search.trim();
-    if (q.length < 2) {
-      setResults([]);
-      return;
-    }
-    const id = setTimeout(async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("status", "approved")
-        .neq("id", userId)
-        .or(`full_name.ilike.%${q}%,username.ilike.%${q}%`)
-        .limit(6);
-      setResults((data as Profile[]) ?? []);
-    }, 300);
-    return () => clearTimeout(id);
-  }, [search, supabase, userId]);
+    const q = search.trim().toLowerCase();
+    const pool = q
+      ? availableConnections.filter(
+          (p) =>
+            p.full_name.toLowerCase().includes(q) ||
+            p.username.toLowerCase().includes(q),
+        )
+      : availableConnections;
+
+    setResults(pool.slice(0, 8));
+  }, [search, availableConnections]);
 
   const add = async () => {
-    if (!selected) return;
+    if (!selected || busy) return;
     setBusy(true);
-    const { data, error } = await supabase
-      .from("relations")
-      .insert({
-        user_id: userId,
-        related_user_id: selected.id,
-        relation_type: relationType,
-      } as never)
-      .select("*, related_profile:related_user_id(*)")
-      .single();
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    setItems((prev) => [data as unknown as RelationWithProfile, ...prev]);
-    setSelected(null);
-    setSearch("");
-    setResults([]);
-    toast.success("Relation added");
-    router.refresh();
+    try {
+      const result = await addRelationAction(selected.id, relationType);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+
+      setItems((prev) => [result.data, ...prev]);
+      setSelected(null);
+      setSearch("");
+      setDropdownOpen(false);
+      toast.success("Relation added");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const remove = async (id: string) => {
     const prev = items;
     setItems(items.filter((r) => r.id !== id));
-    const { error } = await supabase.from("relations").delete().eq("id", id);
-    if (error) {
+    const result = await removeRelationAction(id);
+    if (!result.success) {
       setItems(prev);
-      toast.error(error.message);
+      toast.error(result.error);
       return;
     }
     toast.success("Relation removed");
-    router.refresh();
   };
+
+  const showDropdown = dropdownOpen && results.length > 0 && !selected;
 
   return (
     <div className="space-y-6">
@@ -104,18 +106,25 @@ export function RelationsManager({ userId, initial }: Props) {
               onChange={(e) => {
                 setSelected(null);
                 setSearch(e.target.value);
+                setDropdownOpen(true);
               }}
-              placeholder="Search by name or username"
+              onFocus={() => setDropdownOpen(true)}
+              onBlur={() => {
+                window.setTimeout(() => setDropdownOpen(false), 150);
+              }}
+              placeholder="Search your connections"
             />
-            {results.length > 0 && !selected && (
+            {showDropdown && (
               <div className="absolute z-10 mt-1 w-full rounded-xl border border-border bg-surface shadow-elevated max-h-60 overflow-y-auto">
                 {results.map((p) => (
                   <button
                     key={p.id}
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
                       setSelected(p);
-                      setResults([]);
+                      setSearch("");
+                      setDropdownOpen(false);
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-subtle"
                   >
@@ -127,6 +136,11 @@ export function RelationsManager({ userId, initial }: Props) {
                   </button>
                 ))}
               </div>
+            )}
+            {dropdownOpen && !selected && availableConnections.length === 0 && (
+              <p className="mt-2 text-xs text-ink-subtle">
+                Accept connection requests first, then add them here as relationships.
+              </p>
             )}
           </div>
 
@@ -141,7 +155,7 @@ export function RelationsManager({ userId, initial }: Props) {
             ))}
           </Select>
 
-          <Button onClick={add} loading={busy} disabled={!selected}>
+          <Button onClick={add} loading={busy} disabled={!selected || busy}>
             <Plus className="h-4 w-4" /> Add
           </Button>
         </div>
