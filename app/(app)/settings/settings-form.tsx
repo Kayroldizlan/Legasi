@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -37,7 +36,6 @@ interface Props {
 }
 
 export function ProfileSettingsForm({ profile, socials }: Props) {
-  const router = useRouter();
   const patchProfile = useAuthStore((s) => s.patchProfile);
   const [savingProfile, setSavingProfile] = React.useState(false);
   const [savingSocials, setSavingSocials] = React.useState(false);
@@ -196,8 +194,6 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   };
 
   const onSubmitProfile = async (values: ProfileInput) => {
-    setSavingProfile(true);
-
     const normalized = {
       full_name: values.full_name.trim(),
       username: values.username.toLowerCase().trim(),
@@ -211,6 +207,26 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       country: cleanString(values.country),
     };
 
+    // Snapshot the current visible fields so we can roll back on failure.
+    const previous: Partial<Profile> = {
+      full_name: profile.full_name,
+      username: profile.username,
+      occupation: profile.occupation,
+      company: profile.company,
+      bio: profile.bio,
+      phone: profile.phone,
+      website: profile.website,
+      address: profile.address,
+      city: profile.city,
+      country: profile.country,
+    };
+
+    // Optimistic update — sidebar/topbar/store reflect the new values
+    // before the network roundtrip finishes, so the UI feels instant.
+    patchProfile(normalized as Partial<Profile>);
+    setSavingProfile(true);
+    const toastId = toast.loading("Saving profile…");
+
     const { error } = await supabase
       .from("profiles")
       .update(normalized as never)
@@ -219,21 +235,42 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
     setSavingProfile(false);
 
     if (error) {
-      // Friendly unique-violation message for username collisions.
+      // Roll back the optimistic patch so the UI matches reality.
+      patchProfile(previous);
+
       if (
         error.code === "23505" ||
         /duplicate key|unique constraint/i.test(error.message)
       ) {
-        toast.error("That username is already taken. Try another one.");
+        toast.error("That username is already taken. Try another one.", {
+          id: toastId,
+        });
       } else {
-        toast.error(error.message || "Could not save profile.");
+        toast.error(error.message || "Could not save profile.", { id: toastId });
       }
       return;
     }
 
-    patchProfile(normalized as Partial<Profile>);
-    toast.success("Profile saved");
-    router.refresh();
+    // Sync the form back to the normalized values (e.g. lowercased username,
+    // trimmed strings, https://-prefixed website) so the inputs reflect what
+    // was actually saved.
+    profileForm.reset({
+      full_name: normalized.full_name,
+      username: normalized.username,
+      occupation: normalized.occupation ?? "",
+      company: normalized.company ?? "",
+      bio: normalized.bio ?? "",
+      phone: normalized.phone ?? "",
+      website: normalized.website ?? "",
+      address: normalized.address ?? "",
+      city: normalized.city ?? "",
+      country: normalized.country ?? "",
+    });
+
+    toast.success("Profile saved", { id: toastId });
+    // NOTE: no router.refresh() — zustand already reflects the new values
+    // everywhere the profile is shown, and a Server Component refresh would
+    // just add 300–800 ms of perceived latency.
   };
 
   /** Show the first Zod validation error in a toast so users never wonder
@@ -250,7 +287,6 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   };
 
   const onSubmitSocials = async (values: SocialLinksInput) => {
-    setSavingSocials(true);
     const payload = {
       profile_id: profile.id,
       facebook: normalizeUrl(values.facebook),
@@ -260,12 +296,32 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       whatsapp: cleanString(values.whatsapp),
       twitter: normalizeUrl(values.twitter),
     };
+
+    setSavingSocials(true);
+    const toastId = toast.loading("Saving social links…");
+
     const { error } = await supabase
       .from("social_links")
       .upsert(payload as never, { onConflict: "profile_id" });
+
     setSavingSocials(false);
-    if (error) return toast.error(error.message || "Could not save links.");
-    toast.success("Social links saved");
+
+    if (error) {
+      toast.error(error.message || "Could not save links.", { id: toastId });
+      return;
+    }
+
+    // Sync the form to the normalized values so inputs reflect saved state.
+    socialsForm.reset({
+      facebook: payload.facebook ?? "",
+      instagram: payload.instagram ?? "",
+      tiktok: payload.tiktok ?? "",
+      linkedin: payload.linkedin ?? "",
+      whatsapp: payload.whatsapp ?? "",
+      twitter: payload.twitter ?? "",
+    });
+
+    toast.success("Social links saved", { id: toastId });
   };
 
   const onSocialsFormError = (
