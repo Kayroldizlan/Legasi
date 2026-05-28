@@ -5,13 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
 
-import { Avatar, LinkButton } from "@/components/ui";
+import { LinkButton } from "@/components/ui";
 import { NAV_LINKS_PUBLIC } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
+import { UserMenu } from "./user-menu";
 
 export function PublicNavbar() {
   const profile = useAuthStore((s) => s.profile);
@@ -51,15 +52,7 @@ export function PublicNavbar() {
         <div className="flex items-center gap-2">
           {!isDarkMarketing && <ThemeToggle />}
           {profile ? (
-            <LinkButton
-              href="/dashboard"
-              variant="primary"
-              size="sm"
-              className="hidden sm:inline-flex"
-            >
-              <Avatar src={profile.avatar_url} name={profile.full_name} size={22} />
-              <span className="ml-1">Dashboard</span>
-            </LinkButton>
+            <UserMenu />
           ) : (
             <>
               <LinkButton
@@ -120,6 +113,35 @@ export function PublicNavbar() {
               {l.label}
             </Link>
           ))}
+          {profile && (
+            <>
+              <div className="my-2 h-px bg-border" />
+              <Link
+                href="/dashboard"
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "block px-3 py-2 rounded-lg text-sm font-medium",
+                  isDarkMarketing
+                    ? "text-zinc-400 hover:bg-white/5 hover:text-white"
+                    : "text-ink-muted hover:bg-surface-subtle hover:text-ink",
+                )}
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="/settings"
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "block px-3 py-2 rounded-lg text-sm font-medium",
+                  isDarkMarketing
+                    ? "text-zinc-400 hover:bg-white/5 hover:text-white"
+                    : "text-ink-muted hover:bg-surface-subtle hover:text-ink",
+                )}
+              >
+                Settings
+              </Link>
+            </>
+          )}
         </nav>
       )}
     </header>
