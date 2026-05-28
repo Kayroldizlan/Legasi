@@ -58,7 +58,7 @@
   }
 
   .card {
-    @apply rounded-2xl bg-surface border border-border shadow-soft;
+    @apply rounded-2xl bg-surface border border-border shadow-soft p-6;
   }
 
   .input-base {
