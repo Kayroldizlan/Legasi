@@ -194,14 +194,23 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   };
 
   const onSubmitProfile = async (values: ProfileInput) => {
-    // No-op detection that's robust against "change → save → change back"
-    // sequences. `isDirty` is keyed off the last form.reset(), so after a
-    // successful save the form is considered pristine again — and only
-    // becomes dirty when the user actually edits something new.
-    if (!profileForm.formState.isDirty) {
-      toast.success("Nothing to save");
-      return;
-    }
+    // IMPORTANT: do NOT short-circuit on `formState.isDirty` here.
+    //
+    // React Hook Form's `formState` is a Proxy that lazily computes derived
+    // flags (`isDirty`, `dirtyFields`, etc.) only when a component
+    // subscribes to them DURING RENDER. Reading `formState.isDirty` only
+    // inside this submit handler does not register a subscription, so RHF
+    // never recomputes it and the flag is permanently stuck at `false` —
+    // which is exactly the bug that caused "Nothing to save" to appear
+    // after legitimate edits.
+    //
+    // The user's intent is clear: they clicked Save Changes. So we always
+    // run the save. PostgREST will accept identical values without error,
+    // and the optimistic UI + form.reset() below keep everything in sync.
+    //
+    // Image changes (avatar / cover) are NOT routed through this handler.
+    // They save themselves the moment the user picks or removes a file
+    // inside `uploadImage` / `removeImage`, with their own optimistic UI.
 
     const normalized = {
       full_name: values.full_name.trim(),
@@ -303,10 +312,11 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   };
 
   const onSubmitSocials = async (values: SocialLinksInput) => {
-    if (!socialsForm.formState.isDirty) {
-      toast.success("Nothing to save");
-      return;
-    }
+    // See the long note in `onSubmitProfile` — RHF's `formState.isDirty`
+    // requires a render-time subscription, and reading it only here would
+    // leave it permanently `false`. Always perform the save when the user
+    // clicks; identical-value upserts are accepted by Supabase and the
+    // optimistic UI + reset below keep state in sync.
 
     const payload = {
       profile_id: profile.id,
