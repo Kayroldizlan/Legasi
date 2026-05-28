@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { Footer } from "@/components/layout/footer";
 import { Avatar, Badge, LinkButton } from "@/components/ui";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
@@ -188,6 +189,8 @@ export default async function HomePage() {
           </ul>
         </div>
       </section>
+
+      <Footer />
     </>
   );
 }
