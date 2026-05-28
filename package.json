@@ -1,0 +1,48 @@
+{
+  "name": "connect-directory",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ConnectDirectory - Professional directory & networking platform built with Next.js 15, Supabase, and React Flow.",
+  "scripts": {
+    "dev": "next dev",
+    "pwa:icons": "node scripts/generate-pwa-icons.mjs",
+    "postinstall": "node scripts/generate-pwa-icons.mjs",
+    "build": "node scripts/generate-pwa-icons.mjs && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^3.9.1",
+    "@serwist/next": "^9.5.11",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.46.1",
+    "@xyflow/react": "^12.3.5",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.460.0",
+    "next": "^15.1.0",
+    "next-themes": "^0.4.3",
+    "qrcode.react": "^4.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.53.2",
+    "react-hot-toast": "^2.4.1",
+    "serwist": "^9.5.11",
+    "tailwind-merge": "^2.5.4",
+    "zod": "^3.23.8",
+    "zustand": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.1",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.15.0",
+    "eslint-config-next": "^15.1.0",
+    "postcss": "^8.4.49",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.6.3"
+  }
+}

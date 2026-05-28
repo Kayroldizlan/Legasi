@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --surface: 255 255 255;
+    --surface-muted: 248 250 252;
+    --surface-subtle: 241 245 249;
+    --ink: 15 23 42;
+    --ink-muted: 71 85 105;
+    --ink-subtle: 148 163 184;
+    --border: 226 232 240;
+  }
+
+  .dark {
+    --surface: 15 23 42;
+    --surface-muted: 17 24 39;
+    --surface-subtle: 30 41 59;
+    --ink: 248 250 252;
+    --ink-muted: 203 213 225;
+    --ink-subtle: 100 116 139;
+    --border: 51 65 85;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-surface-muted text-ink antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Better default focus ring */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-surface;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-subtle;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply backdrop-blur-md bg-surface/80 border border-border;
+  }
+
+  .card {
+    @apply rounded-2xl bg-surface border border-border shadow-soft;
+  }
+
+  .input-base {
+    @apply w-full rounded-xl border border-border bg-surface px-3.5 py-2.5
+           text-sm text-ink placeholder:text-ink-subtle
+           transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20
+           disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden bg-surface-subtle rounded-md;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0,
+      rgb(var(--border) / 0.6) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+}
+
+/* React Flow theme overrides */
+.react-flow__node {
+  font-family: inherit;
+}
+
+.react-flow__edge-path {
+  stroke-width: 1.5;
+}
+
+.react-flow__controls {
+  @apply rounded-xl overflow-hidden border border-border bg-surface shadow-soft;
+}
+.react-flow__controls-button {
+  @apply bg-surface text-ink border-border;
+}
