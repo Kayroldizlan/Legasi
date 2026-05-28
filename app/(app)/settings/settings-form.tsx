@@ -21,6 +21,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { compressAvatar, compressCover } from "@/lib/upload-image";
 import {
+  normalizeProfileInput,
   normalizeUrl,
   profileSchema,
   socialLinksSchema,
@@ -29,6 +30,8 @@ import {
 } from "@/lib/validations";
 import { useAuthStore } from "@/store/auth-store";
 
+import { updateProfileAction } from "./actions";
+
 import type { Profile, SocialLinks } from "@/types/database";
 
 interface Props {
@@ -36,35 +39,7 @@ interface Props {
   socials: SocialLinks | null;
 }
 
-/** Prevent infinite hangs if the Supabase fetch never resolves. */
 const PROFILE_SAVE_TIMEOUT_MS = 20_000;
-
-async function updateProfileWithTimeout(
-  supabase: ReturnType<typeof createClient>,
-  profileId: string,
-  payload: Record<string, string | null>,
-) {
-  const updatePromise = supabase
-    .from("profiles")
-    .update(payload as never)
-    .eq("id", profileId)
-    .select("id")
-    .maybeSingle();
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(
-      () =>
-        reject(
-          new Error(
-            "Profile save timed out — check your network or sign in again.",
-          ),
-        ),
-      PROFILE_SAVE_TIMEOUT_MS,
-    );
-  });
-
-  return Promise.race([updatePromise, timeoutPromise]);
-}
 
 export function ProfileSettingsForm({ profile, socials }: Props) {
   const patchProfile = useAuthStore((s) => s.patchProfile);
@@ -72,17 +47,6 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   const [savingSocials, setSavingSocials] = React.useState(false);
   const [avatarUrl, setAvatarUrl] = React.useState(profile.avatar_url);
   const [coverUrl, setCoverUrl] = React.useState(profile.cover_url);
-
-  React.useEffect(() => {
-    console.log("SETTINGS FORM MOUNTED");
-    return () => {
-      console.log("SETTINGS FORM UNMOUNTED");
-    };
-  }, []);
-
-  React.useEffect(() => {
-    console.log("savingProfile CHANGED:", savingProfile);
-  }, [savingProfile]);
 
   const supabase = React.useMemo(() => createClient(), []);
 
@@ -236,26 +200,8 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   };
 
   const onSubmitProfile = async (values: ProfileInput) => {
-    // Image changes (avatar / cover) are saved independently by
-    // uploadImage/removeImage. This handler always executes the profile
-    // UPDATE query when Save Changes is clicked.
-    console.log("SAVE CLICKED");
+    const normalized = normalizeProfileInput(values);
 
-    const normalized = {
-      full_name: values.full_name.trim(),
-      username: values.username.toLowerCase().trim(),
-      occupation: cleanString(values.occupation),
-      company: cleanString(values.company),
-      bio: cleanString(values.bio),
-      phone: cleanString(values.phone),
-      website: normalizeUrl(values.website),
-      address: cleanString(values.address),
-      city: cleanString(values.city),
-      country: cleanString(values.country),
-    };
-
-    // Snapshot every editable field so rollback restores the form and
-    // store to exactly what the user saw before clicking Save.
     const previous = {
       full_name: profile.full_name,
       username: profile.username,
@@ -269,20 +215,13 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       country: profile.country,
     };
 
-    console.log("SET LOADING TRUE");
     setSavingProfile(true);
 
-    // Safety net: if any awaited Supabase call hangs, still reset the
-    // button even if finally somehow fails to run on time.
     const safetyResetId = window.setTimeout(() => {
-      console.log("SAFETY LOADING RESET");
       setSavingProfile(false);
     }, PROFILE_SAVE_TIMEOUT_MS + 2_000);
 
     try {
-      // OPTIMISTIC UI — store + form update instantly, success toast
-      // appears in the same render frame. The user-perceived latency is
-      // bounded by browser frame time, not the Supabase roundtrip.
       patchProfile(normalized as Partial<Profile>);
       profileForm.reset({
         full_name: normalized.full_name,
@@ -296,50 +235,27 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
         city: normalized.city ?? "",
         country: normalized.country ?? "",
       });
-      toast.success("Profile saved");
 
-      console.log("BEFORE SUPABASE");
-      const { error } = await updateProfileWithTimeout(
-        supabase,
-        profile.id,
-        normalized,
-      );
-      console.log("AFTER SUPABASE");
+      const result = await Promise.race([
+        updateProfileAction(values),
+        new Promise<{ success: false; error: string }>((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                success: false,
+                error:
+                  "Profile save timed out — check your network or sign in again.",
+              }),
+            PROFILE_SAVE_TIMEOUT_MS,
+          ),
+        ),
+      ]);
 
-      if (!error) {
-        console.log("SUPABASE UPDATE SUCCESS");
-      } else {
-        // Roll the optimistic update back to match the actual DB state.
-        patchProfile(previous as Partial<Profile>);
-        profileForm.reset({
-          full_name: previous.full_name,
-          username: previous.username,
-          occupation: previous.occupation ?? "",
-          company: previous.company ?? "",
-          bio: previous.bio ?? "",
-          phone: previous.phone ?? "",
-          website: previous.website ?? "",
-          address: previous.address ?? "",
-          city: previous.city ?? "",
-          country: previous.country ?? "",
-        });
-
-        console.log("SUPABASE UPDATE ERROR", error);
-        if (
-          error.code === "23505" ||
-          /duplicate key|unique constraint/i.test(error.message)
-        ) {
-          toast.error(
-            "That username is already taken — your changes were rolled back.",
-          );
-        } else {
-          toast.error(
-            `Could not save profile: ${error.message || "please try again"}`,
-          );
-        }
+      if (result.success) {
+        toast.success("Profile saved");
+        return;
       }
-    } catch (error: unknown) {
-      // Roll back optimistic state for unexpected failures.
+
       patchProfile(previous as Partial<Profile>);
       profileForm.reset({
         full_name: previous.full_name,
@@ -354,15 +270,31 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
         country: previous.country ?? "",
       });
 
-      console.log("SUPABASE UPDATE ERROR", error);
+      toast.error(
+        result.error.includes("username")
+          ? "That username is already taken — your changes were rolled back."
+          : `Could not save profile: ${result.error}`,
+      );
+    } catch (error: unknown) {
+      patchProfile(previous as Partial<Profile>);
+      profileForm.reset({
+        full_name: previous.full_name,
+        username: previous.username,
+        occupation: previous.occupation ?? "",
+        company: previous.company ?? "",
+        bio: previous.bio ?? "",
+        phone: previous.phone ?? "",
+        website: previous.website ?? "",
+        address: previous.address ?? "",
+        city: previous.city ?? "",
+        country: previous.country ?? "",
+      });
+
       const message =
         error instanceof Error ? error.message : "Unknown save error";
       toast.error(`Could not save profile: ${message}`);
     } finally {
       window.clearTimeout(safetyResetId);
-      console.log("ENTER FINALLY");
-      console.log("SET LOADING FALSE");
-      console.log("CURRENT savingProfile", savingProfile);
       setSavingProfile(false);
     }
   };

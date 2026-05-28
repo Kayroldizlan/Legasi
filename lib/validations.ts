@@ -110,6 +110,30 @@ export function normalizeUrl(value: string | null | undefined): string | null {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
+function cleanOptionalString(value: string | undefined | null): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/** Normalize profile form values for DB storage (trim, lowercase username, null blanks). */
+export function normalizeProfileInput(input: ProfileInput) {
+  return {
+    full_name: input.full_name.trim(),
+    username: input.username.toLowerCase().trim(),
+    occupation: cleanOptionalString(input.occupation),
+    company: cleanOptionalString(input.company),
+    bio: cleanOptionalString(input.bio),
+    phone: cleanOptionalString(input.phone),
+    website: normalizeUrl(input.website),
+    address: cleanOptionalString(input.address),
+    city: cleanOptionalString(input.city),
+    country: cleanOptionalString(input.country),
+  };
+}
+
+export type NormalizedProfileInput = ReturnType<typeof normalizeProfileInput>;
+
 export const messageSchema = z.object({
   message: z.string().min(1, "Type something").max(2000),
 });
