@@ -10,6 +10,7 @@ export interface DirectoryFilters {
   country: string;
   company: string;
   relation: string;
+  category?: string;
   sort: DirectorySort;
   page: number;
   pageSize: number;

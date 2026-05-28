@@ -37,6 +37,20 @@ export async function searchProfiles(
   if (filters.country)    query = query.ilike("country", `%${filters.country}%`);
   if (filters.company)    query = query.ilike("company", `%${filters.company}%`);
 
+  switch (filters.category) {
+    case "verified":
+      query = query.eq("is_verified", true);
+      break;
+    case "businesses":
+      query = query.not("company", "is", null).neq("company", "");
+      break;
+    case "families":
+      query = query.not("address", "is", null).neq("address", "");
+      break;
+    default:
+      break;
+  }
+
   switch (filters.sort) {
     case "alphabetical":
       query = query.order("full_name", { ascending: true });
