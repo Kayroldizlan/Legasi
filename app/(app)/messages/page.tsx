@@ -23,10 +23,10 @@ export default async function MessagesPage() {
   const conversations = await listConversations(supabase, user!.id);
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex">
+    <div className="flex h-[calc(100vh-4rem)]">
       <ConversationList conversations={conversations} />
 
-      <div className="hidden lg:flex flex-1 items-center justify-center bg-surface-muted">
+      <div className="hidden flex-1 items-center justify-center bg-zinc-50/80 lg:flex">
         <EmptyState
           icon={MessageSquare}
           title="Pick a conversation"
@@ -36,6 +36,7 @@ export default async function MessagesPage() {
               Browse directory
             </LinkButton>
           }
+          className="border-zinc-200 bg-white"
         />
       </div>
     </div>
@@ -48,10 +49,15 @@ function ConversationList({
   conversations: Awaited<ReturnType<typeof listConversations>>;
 }) {
   return (
-    <aside className="w-full lg:w-80 xl:w-96 shrink-0 border-r border-border bg-surface flex flex-col">
-      <div className="border-b border-border px-5 py-4">
-        <h1 className="text-lg font-semibold">Messages</h1>
-        <p className="text-xs text-ink-subtle">{conversations.length} conversations</p>
+    <aside className="flex w-full shrink-0 flex-col border-r border-zinc-100 bg-white lg:w-80 xl:w-96">
+      <div className="border-b border-zinc-100 px-5 py-6">
+        <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
+          Inbox
+        </p>
+        <h1 className="mt-1 text-xl font-semibold text-ink">Messages</h1>
+        <p className="mt-1 text-xs text-zinc-500">
+          {conversations.length} conversations
+        </p>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -61,6 +67,7 @@ function ConversationList({
               icon={MessageSquare}
               title="No conversations yet"
               description="Visit a profile and tap Message to start chatting."
+              className="border-zinc-200 bg-zinc-50/50"
             />
           </div>
         ) : (
@@ -69,7 +76,7 @@ function ConversationList({
               <li key={c.partner.id}>
                 <Link
                   href={`/messages/${c.partner.id}`}
-                  className="flex items-start gap-3 border-b border-border px-5 py-4 hover:bg-surface-subtle"
+                  className="flex items-start gap-3 border-b border-zinc-100 px-5 py-4 transition hover:bg-zinc-50"
                 >
                   <Avatar
                     src={c.partner.avatar_url}
@@ -77,17 +84,17 @@ function ConversationList({
                     size={44}
                     online={c.partner.is_online}
                   />
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-semibold">
+                      <p className="truncate text-sm font-semibold text-ink">
                         {c.partner.full_name}
                       </p>
-                      <span className="text-[10px] text-ink-subtle whitespace-nowrap">
+                      <span className="whitespace-nowrap text-[10px] text-zinc-400">
                         {formatRelativeTime(c.last_message?.created_at)}
                       </span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2">
-                      <p className="flex-1 truncate text-xs text-ink-muted">
+                      <p className="flex-1 truncate text-xs text-zinc-500">
                         {truncate(c.last_message?.message, 60) || "Say hi 👋"}
                       </p>
                       {c.unread_count > 0 && (

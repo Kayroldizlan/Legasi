@@ -1,6 +1,11 @@
-import { Bell } from "lucide-react";
+import { Bell, CheckCheck, Inbox } from "lucide-react";
 import type { Metadata } from "next";
 
+import {
+  PageContent,
+  PageHero,
+  PageStatsBar,
+} from "@/components/layout/page-layout";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { EmptyState } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
@@ -18,26 +23,57 @@ export default async function NotificationsPage() {
     page: 1,
   });
 
-  return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 lg:px-8 lg:py-10">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">
-          Notifications
-        </h1>
-        <p className="text-sm text-zinc-500">
-          Stay on top of activity across your network in real time.
-        </p>
-      </header>
+  const unread = data.filter((n) => !n.is_read).length;
 
-      {data.length === 0 ? (
-        <EmptyState
-          icon={Bell}
-          title="No notifications yet"
-          description="When activity happens, you'll see it here instantly."
-        />
-      ) : (
-        <NotificationCenter initial={data} initialTotal={total} />
-      )}
-    </div>
+  return (
+    <>
+      <PageHero
+        eyebrow="Activity"
+        title="Notifications"
+        description="Stay on top of activity across your network in real time."
+      />
+
+      <PageStatsBar
+        stats={[
+          {
+            icon: Inbox,
+            label: "Total",
+            value: total,
+            accent: "bg-brand-50 text-brand-600",
+          },
+          {
+            icon: Bell,
+            label: "Unread",
+            value: unread,
+            accent: "bg-pink-50 text-pink-600",
+          },
+          {
+            icon: CheckCheck,
+            label: "Read",
+            value: total - unread,
+            accent: "bg-emerald-50 text-emerald-600",
+          },
+          {
+            icon: Bell,
+            label: "This page",
+            value: data.length,
+            accent: "bg-amber-50 text-amber-600",
+          },
+        ]}
+      />
+
+      <PageContent className="mx-auto max-w-3xl">
+        {data.length === 0 ? (
+          <EmptyState
+            icon={Bell}
+            title="No notifications yet"
+            description="When activity happens, you'll see it here instantly."
+            className="border-zinc-200 bg-zinc-50/50"
+          />
+        ) : (
+          <NotificationCenter initial={data} initialTotal={total} />
+        )}
+      </PageContent>
+    </>
   );
 }

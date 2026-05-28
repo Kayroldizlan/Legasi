@@ -67,8 +67,8 @@ export const NAV_LINKS_PRIVATE = [
   { href: "/directory",     label: "Directory",     icon: "Users" },
   { href: "/connections",   label: "Connections",   icon: "UserPlus" },
   { href: "/messages",      label: "Messages",      icon: "MessageSquare" },
-  { href: "/notifications", label: "Notifications", icon: "Bell" },
   { href: "/settings",      label: "Settings",      icon: "Settings" },
+  { href: "/about",         label: "About",         icon: "Compass" },
 ];
 
 export const NAV_LINKS_ADMIN = [

@@ -15,9 +15,12 @@ export function ConversationSidebar({
   activePartnerId: string;
 }) {
   return (
-    <aside className="hidden lg:flex w-80 xl:w-96 shrink-0 border-r border-border bg-surface flex-col">
-      <div className="border-b border-border px-5 py-4">
-        <h1 className="text-lg font-semibold">Messages</h1>
+    <aside className="hidden w-80 shrink-0 flex-col border-r border-zinc-100 bg-white lg:flex xl:w-96">
+      <div className="border-b border-zinc-100 px-5 py-6">
+        <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
+          Inbox
+        </p>
+        <h1 className="mt-1 text-xl font-semibold text-ink">Messages</h1>
       </div>
       <div className="flex-1 overflow-y-auto">
         {conversations.map((c) => (
@@ -25,10 +28,10 @@ export function ConversationSidebar({
             key={c.partner.id}
             href={`/messages/${c.partner.id}`}
             className={cn(
-              "flex items-start gap-3 border-b border-border px-5 py-4 transition",
+              "flex items-start gap-3 border-b border-zinc-100 px-5 py-4 transition",
               c.partner.id === activePartnerId
-                ? "bg-brand-50/60 dark:bg-brand-950/30"
-                : "hover:bg-surface-subtle",
+                ? "bg-brand-50/60"
+                : "hover:bg-zinc-50",
             )}
           >
             <Avatar
@@ -37,15 +40,15 @@ export function ConversationSidebar({
               size={44}
               online={c.partner.is_online}
             />
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-sm font-semibold">{c.partner.full_name}</p>
-                <span className="text-[10px] text-ink-subtle">
+                <p className="truncate text-sm font-semibold text-ink">{c.partner.full_name}</p>
+                <span className="text-[10px] text-zinc-400">
                   {formatRelativeTime(c.last_message?.created_at)}
                 </span>
               </div>
               <div className="mt-0.5 flex items-center gap-2">
-                <p className="flex-1 truncate text-xs text-ink-muted">
+                <p className="flex-1 truncate text-xs text-zinc-500">
                   {truncate(c.last_message?.message, 60)}
                 </p>
                 {c.unread_count > 0 && <Badge tone="brand">{c.unread_count}</Badge>}

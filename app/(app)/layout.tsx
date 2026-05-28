@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-import { AppTopbar } from "@/components/layout/app-topbar";
-import { Sidebar } from "@/components/layout/sidebar";
+import { AppShell } from "@/components/layout/app-shell";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({
@@ -16,12 +16,14 @@ export default async function AppLayout({
   if (!user) redirect("/login");
 
   return (
-    <div className="flex min-h-screen bg-surface-muted">
-      <Sidebar variant="user" />
-      <div className="flex min-h-screen flex-1 flex-col overflow-x-hidden">
-        <AppTopbar />
-        <main className="flex-1">{children}</main>
-      </div>
-    </div>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-surface-muted text-sm text-zinc-500">
+          Loading…
+        </div>
+      }
+    >
+      <AppShell>{children}</AppShell>
+    </Suspense>
   );
 }

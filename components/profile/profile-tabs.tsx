@@ -31,7 +31,7 @@ export function ProfileTabs({ tabs, panels, defaultTab }: ProfileTabsProps) {
     <div>
       <div
         role="tablist"
-        className="flex w-full items-center gap-1 overflow-x-auto rounded-2xl border border-zinc-200 bg-white px-2 shadow-soft"
+        className="grid w-full grid-cols-3 rounded-2xl border border-zinc-200 bg-white shadow-soft sm:grid-cols-6"
       >
         {tabs.map((tab) => {
           const isActive = active === tab.id;
@@ -43,14 +43,14 @@ export function ProfileTabs({ tabs, panels, defaultTab }: ProfileTabsProps) {
               aria-selected={isActive}
               onClick={() => setActive(tab.id)}
               className={cn(
-                "relative shrink-0 px-4 py-3.5 text-sm font-medium transition",
+                "relative flex min-w-0 items-center justify-center gap-1 px-1 py-3 text-center text-xs font-medium transition sm:px-2 sm:py-3.5 sm:text-sm",
                 isActive ? "text-brand-600" : "text-zinc-500 hover:text-ink",
               )}
             >
               {tab.label}
               <span
                 className={cn(
-                  "absolute inset-x-2 -bottom-px h-0.5 rounded-full transition",
+                  "absolute inset-x-1 bottom-0 h-0.5 rounded-full transition sm:inset-x-2",
                   isActive ? "bg-brand-600" : "bg-transparent",
                 )}
                 aria-hidden

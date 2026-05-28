@@ -306,7 +306,6 @@ export default async function PublicProfilePage({ params }: PageProps) {
                 </span>
               ),
             },
-            { id: "saved", label: "Saved" },
             { id: "businesses", label: "Businesses" },
             { id: "media", label: "Media" },
           ]}
@@ -320,12 +319,6 @@ export default async function PublicProfilePage({ params }: PageProps) {
             ),
             connections: connectionsPanel,
             communities: communitiesPanel,
-            saved: (
-              <ProfileComingSoon
-                icon={<Sparkles className="h-6 w-6" />}
-                label="Saved"
-              />
-            ),
             businesses: (
               <ProfileComingSoon
                 icon={<Building2 className="h-6 w-6" />}

@@ -60,10 +60,10 @@ export function NotificationPreferencesForm({ initial }: Props) {
   };
 
   return (
-    <Card>
+    <Card className="rounded-[1.25rem] border-zinc-200 bg-white shadow-soft">
       <CardHeader>
         <CardTitle>Notification preferences</CardTitle>
-        <CardDescription>
+        <CardDescription className="text-zinc-500">
           Choose what you want to be notified about across Legasi.
         </CardDescription>
       </CardHeader>

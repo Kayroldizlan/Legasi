@@ -406,9 +406,12 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
     toast.error(message);
   };
 
+  const sectionCard =
+    "rounded-[1.25rem] border-zinc-200 bg-white shadow-soft";
+
   return (
     <div className="space-y-6">
-      <Card className="overflow-hidden p-0">
+      <Card className={`overflow-hidden p-0 ${sectionCard}`}>
         <ImageDropzone
           shape="rect"
           hasImage={Boolean(coverUrl)}
@@ -495,10 +498,10 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
         </div>
       </Card>
 
-      <Card>
+      <Card className={sectionCard}>
         <CardHeader>
           <CardTitle>Personal information</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-zinc-500">
             This information appears on your public profile.
           </CardDescription>
         </CardHeader>
@@ -547,10 +550,10 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
         </form>
       </Card>
 
-      <Card>
+      <Card className={sectionCard}>
         <CardHeader>
           <CardTitle>Social links</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-zinc-500">
             Enter your username — we&apos;ll add the platform link for you.
           </CardDescription>
         </CardHeader>

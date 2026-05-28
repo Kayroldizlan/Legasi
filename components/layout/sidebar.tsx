@@ -2,9 +2,8 @@
 
 import {
   Activity,
-  ArrowUpRight,
   BarChart3,
-  Bell,
+  Compass,
   Image as ImageIcon,
   LayoutDashboard,
   type LucideIcon,
@@ -12,7 +11,6 @@ import {
   Network,
   Settings,
   Shield,
-  Sparkles,
   UserPlus,
   Users,
   X,
@@ -23,7 +21,6 @@ import { usePathname } from "next/navigation";
 import { NAV_LINKS_ADMIN, NAV_LINKS_PRIVATE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
-import { useNotificationStore } from "@/store/notification-store";
 import { useUIStore } from "@/store/ui-store";
 
 import { Logo } from "./logo";
@@ -33,7 +30,7 @@ const ICONS: Record<string, LucideIcon> = {
   Users,
   UserPlus,
   MessageSquare,
-  Bell,
+  Compass,
   Settings,
   Network,
   BarChart3,
@@ -50,16 +47,10 @@ export function Sidebar({ variant = "user" }: SidebarProps) {
   const profile = useAuthStore((s) => s.profile);
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
-  const unreadNotifications = useNotificationStore((s) => s.unreadCount);
   const pathname = usePathname();
 
   const links = variant === "admin" ? NAV_LINKS_ADMIN : NAV_LINKS_PRIVATE;
   const showAdminEntry = variant === "user" && profile?.role === "admin";
-
-  // Per-link badge counts (shown as small red pills, matching the mockup).
-  const badges: Record<string, number | undefined> = {
-    "/notifications": unreadNotifications > 0 ? unreadNotifications : undefined,
-  };
 
   const Content = (
     <div className="flex h-full flex-col">
@@ -86,7 +77,6 @@ export function Sidebar({ variant = "user" }: SidebarProps) {
             pathname === link.href ||
             (link.href !== "/admin" && pathname.startsWith(link.href + "/")) ||
             (link.href === "/admin" && pathname === "/admin");
-          const badge = badges[link.href];
           return (
             <Link
               key={link.href}
@@ -101,18 +91,6 @@ export function Sidebar({ variant = "user" }: SidebarProps) {
             >
               <Icon className={cn("h-4 w-4", active ? "text-white" : "")} />
               <span className="flex-1">{link.label}</span>
-              {badge !== undefined && (
-                <span
-                  className={cn(
-                    "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold",
-                    active
-                      ? "bg-white/20 text-white"
-                      : "bg-brand-600 text-white",
-                  )}
-                >
-                  {badge > 99 ? "99+" : badge}
-                </span>
-              )}
             </Link>
           );
         })}
@@ -130,25 +108,6 @@ export function Sidebar({ variant = "user" }: SidebarProps) {
           </>
         )}
       </nav>
-
-      <div className="border-t border-border p-4">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 p-4 text-white">
-          <Sparkles
-            className="pointer-events-none absolute -right-2 -top-2 h-16 w-16 text-white/10"
-            aria-hidden
-          />
-          <p className="text-sm font-semibold">Upgrade to Premium</p>
-          <p className="mt-1 text-xs leading-snug text-white/85">
-            Unlock more features and grow your network faster.
-          </p>
-          <Link
-            href="/settings"
-            className="mt-3 inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-soft transition hover:bg-white/90"
-          >
-            Upgrade Now <ArrowUpRight className="h-3 w-3" />
-          </Link>
-        </div>
-      </div>
     </div>
   );
 

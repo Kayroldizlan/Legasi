@@ -71,7 +71,7 @@ export function ConnectionRow({ connection, partner, mode }: Props) {
   if (hidden) return null;
 
   return (
-    <div className="card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="flex flex-col gap-3 rounded-[1.25rem] border border-zinc-200 bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
       <Link
         href={buildProfileUrl(partner.username)}
         className="flex items-center gap-3 min-w-0"
