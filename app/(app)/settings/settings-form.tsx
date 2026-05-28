@@ -43,6 +43,17 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   const [avatarUrl, setAvatarUrl] = React.useState(profile.avatar_url);
   const [coverUrl, setCoverUrl] = React.useState(profile.cover_url);
 
+  React.useEffect(() => {
+    console.log("SETTINGS FORM MOUNTED");
+    return () => {
+      console.log("SETTINGS FORM UNMOUNTED");
+    };
+  }, []);
+
+  React.useEffect(() => {
+    console.log("savingProfile CHANGED:", savingProfile);
+  }, [savingProfile]);
+
   const supabase = React.useMemo(() => createClient(), []);
 
   const profileForm = useForm<ProfileInput>({
@@ -228,7 +239,7 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       country: profile.country,
     };
 
-    console.log("LOADING TRUE");
+    console.log("SET LOADING TRUE");
     setSavingProfile(true);
 
     try {
@@ -250,11 +261,12 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       });
       toast.success("Profile saved");
 
-      console.log("PROFILE UPDATE RUNNING");
+      console.log("BEFORE SUPABASE");
       const { error } = await supabase
         .from("profiles")
         .update(normalized as never)
         .eq("id", profile.id);
+      console.log("AFTER SUPABASE");
 
       if (!error) {
         console.log("SUPABASE UPDATE SUCCESS");
@@ -309,7 +321,9 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
         error instanceof Error ? error.message : "Unknown save error";
       toast.error(`Could not save profile: ${message}`);
     } finally {
-      console.log("LOADING FALSE");
+      console.log("ENTER FINALLY");
+      console.log("SET LOADING FALSE");
+      console.log("CURRENT savingProfile", savingProfile);
       setSavingProfile(false);
     }
   };
