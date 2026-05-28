@@ -40,8 +40,10 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <div className="space-y-4 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Check your email</h1>
+      <div className="space-y-2 text-center sm:text-left">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
+          Check your email
+        </h1>
         <p className="text-sm text-ink-muted">
           We sent you a password reset link. Follow it to set a new password.
         </p>
@@ -58,7 +60,9 @@ export default function ForgotPasswordPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Reset password</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
+          Reset password
+        </h1>
         <p className="text-sm text-ink-muted">
           Enter your email and we'll send a reset link.
         </p>

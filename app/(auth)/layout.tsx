@@ -1,58 +1,37 @@
-import Link from "next/link";
-
-import { APP_NAME } from "@/lib/constants";
+import { AuthBrandPanel } from "@/components/auth/auth-brand-panel";
+import { AuthMarketingFooter } from "@/components/auth/auth-marketing-footer";
+import { AuthStatsBar } from "@/components/auth/auth-stats-bar";
 import { Logo } from "@/components/layout/logo";
+import { createClient } from "@/lib/supabase/server";
 
-export default function AuthLayout({
+export default async function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const supabase = await createClient();
+  const { count: membersCount } = await supabase
+    .from("profiles")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "approved");
+
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
-      <div className="relative hidden lg:flex flex-col justify-between bg-gradient-to-br from-brand-700 via-brand-600 to-brand-800 p-12 text-white overflow-hidden">
-        <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
-        <Logo
-          href="/"
-          variant="full"
-          inverted
-          className="relative z-10"
-        />
-        <div className="relative z-10 max-w-md space-y-6">
-          <h2 className="text-3xl font-semibold leading-tight">
-            Build your professional network with people you actually know.
-          </h2>
-          <p className="text-white/80 text-sm leading-relaxed">
-            {APP_NAME} helps communities, alumni networks, and teams stay
-            connected with rich profiles, real relationships, and instant
-            messaging.
-          </p>
-          <ul className="space-y-3 text-sm text-white/80">
-            {[
-              "Real-time direct messaging",
-              "Interactive relationship hierarchy",
-              "Powerful directory with filters and search",
-              "Modern admin dashboard",
-            ].map((item) => (
-              <li key={item} className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                {item}
-              </li>
-            ))}
-          </ul>
+    <div className="min-h-screen bg-zinc-50">
+      <div className="grid lg:grid-cols-2">
+        <AuthBrandPanel />
+
+        <div className="flex min-h-[720px] flex-col items-center justify-center px-4 py-10 sm:px-8 lg:min-h-screen lg:py-12">
+          <div className="mb-8 lg:hidden">
+            <Logo href="/" />
+          </div>
+          <div className="w-full max-w-[440px] rounded-[1.75rem] border border-zinc-100 bg-white p-8 shadow-[0_20px_60px_rgb(15_23_42/0.08)] sm:p-9">
+            {children}
+          </div>
         </div>
-        <p className="relative z-10 text-xs text-white/70">
-          © {new Date().getFullYear()} {APP_NAME} ·{" "}
-          <Link href="/" className="underline">
-            Back to home
-          </Link>
-        </p>
       </div>
 
-      <div className="flex flex-col items-center justify-center px-4 py-12 sm:px-6 lg:px-12">
-        <div className="w-full max-w-md">{children}</div>
-      </div>
+      <AuthStatsBar membersCount={membersCount ?? 0} />
+      <AuthMarketingFooter />
     </div>
   );
 }
