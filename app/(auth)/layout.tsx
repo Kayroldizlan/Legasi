@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { APP_NAME } from "@/lib/constants";
 import { Logo } from "@/components/layout/logo";
 
 export default function AuthLayout({
@@ -15,14 +16,15 @@ export default function AuthLayout({
         <Logo
           href="/"
           variant="full"
-          className="relative z-10 text-white [&_span]:text-white"
+          inverted
+          className="relative z-10"
         />
         <div className="relative z-10 max-w-md space-y-6">
           <h2 className="text-3xl font-semibold leading-tight">
             Build your professional network with people you actually know.
           </h2>
           <p className="text-white/80 text-sm leading-relaxed">
-            ConnectDirectory helps communities, alumni networks, and teams stay
+            {APP_NAME} helps communities, alumni networks, and teams stay
             connected with rich profiles, real relationships, and instant
             messaging.
           </p>
@@ -41,7 +43,7 @@ export default function AuthLayout({
           </ul>
         </div>
         <p className="relative z-10 text-xs text-white/70">
-          © {new Date().getFullYear()} ConnectDirectory ·{" "}
+          © {new Date().getFullYear()} {APP_NAME} ·{" "}
           <Link href="/" className="underline">
             Back to home
           </Link>

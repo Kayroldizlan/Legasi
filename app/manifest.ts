@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
 
   return {
     name: APP_NAME,
-    short_name: "ConnectDir",
+    short_name: "Legasi",
     description: APP_TAGLINE,
     start_url: "/",
     scope: "/",

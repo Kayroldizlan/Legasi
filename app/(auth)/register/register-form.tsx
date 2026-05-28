@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
 import { Button, Input } from "@/components/ui";
+import { APP_NAME } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 import { registerSchema, type RegisterInput } from "@/lib/validations";
 
@@ -58,7 +59,7 @@ export function RegisterForm() {
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
         <p className="text-sm text-ink-muted">
-          Join your community on ConnectDirectory.
+          Join your community on {APP_NAME}.
         </p>
       </div>
 

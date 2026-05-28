@@ -1,6 +1,8 @@
 import type { RelationType } from "@/types/database";
 
-export const APP_NAME = "ConnectDirectory";
+export const APP_NAME = "Legasi";
+/** Wordmark shown beside the logo mark in the header/sidebar. */
+export const LOGO_WORDMARK = "The Legasi";
 export const APP_TAGLINE = "Where professionals connect, collaborate, and grow.";
 
 export const RELATION_TYPES: RelationType[] = [

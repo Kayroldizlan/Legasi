@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
 import { Button, Input } from "@/components/ui";
+import { APP_NAME } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 import { loginSchema, type LoginInput } from "@/lib/validations";
 
@@ -85,7 +86,7 @@ export function LoginForm({ next }: { next?: string }) {
       </form>
 
       <p className="text-center text-sm text-ink-muted">
-        New to ConnectDirectory?{" "}
+        New to {APP_NAME}?{" "}
         <Link href="/register" className="font-medium text-brand-600 hover:underline">
           Create an account
         </Link>

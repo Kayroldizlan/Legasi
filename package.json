@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs",
-    "postinstall": "node scripts/generate-pwa-icons.mjs",
-    "build": "node scripts/generate-pwa-icons.mjs && next build",
+    "logo:generate": "node scripts/generate-logo.mjs",
+    "postinstall": "node scripts/generate-logo.mjs && node scripts/generate-pwa-icons.mjs",
+    "build": "node scripts/generate-logo.mjs && node scripts/generate-pwa-icons.mjs && next build",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
