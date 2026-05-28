@@ -7,20 +7,21 @@ import {
   User as UserIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import * as React from "react";
 import toast from "react-hot-toast";
 
 import { Avatar } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
+import { signOutAction } from "@/lib/actions/auth";
+import { clearBrowserAuthSession } from "@/lib/client/clear-auth-session";
+import { AUTH_LOGIN_PATH } from "@/lib/auth/routes";
 import { buildProfileUrl } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 
 export function UserMenu() {
   const profile = useAuthStore((s) => s.profile);
   const reset = useAuthStore((s) => s.reset);
-  const router = useRouter();
   const [open, setOpen] = React.useState(false);
+  const [signingOut, setSigningOut] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -34,12 +35,27 @@ export function UserMenu() {
   if (!profile) return null;
 
   const signOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    reset();
-    toast.success("Signed out");
-    router.push("/");
-    router.refresh();
+    if (signingOut) return;
+
+    setSigningOut(true);
+    setOpen(false);
+
+    try {
+      const result = await signOutAction();
+      if (!result.success) {
+        toast.error(result.error || "Could not sign out. Please try again.");
+        return;
+      }
+
+      clearBrowserAuthSession();
+      reset();
+      toast.success("Signed out");
+      window.location.assign(AUTH_LOGIN_PATH);
+    } catch {
+      toast.error("Could not sign out. Please try again.");
+    } finally {
+      setSigningOut(false);
+    }
   };
 
   return (
@@ -68,10 +84,12 @@ export function UserMenu() {
             )}
           </div>
           <button
-            onClick={signOut}
-            className="flex w-full items-center gap-2 border-t border-border px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+            type="button"
+            onClick={() => void signOut()}
+            disabled={signingOut}
+            className="flex w-full items-center gap-2 border-t border-border px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60 dark:hover:bg-red-950/20"
           >
-            <LogOut className="h-4 w-4" /> Sign out
+            <LogOut className="h-4 w-4" /> {signingOut ? "Signing out…" : "Sign out"}
           </button>
         </div>
       )}
