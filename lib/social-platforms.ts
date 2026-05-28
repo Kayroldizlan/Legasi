@@ -56,7 +56,7 @@ export function socialUrlToUsername(
     return trimmed.replace(/^@/, "");
   }
 
-  let normalized = stripUrlDecorations(trimmed);
+  const normalized = stripUrlDecorations(trimmed);
 
   for (const prefix of PLATFORM_PREFIXES[platform]) {
     if (normalized.toLowerCase().startsWith(prefix.toLowerCase())) {
