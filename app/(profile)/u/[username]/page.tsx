@@ -13,6 +13,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ProfileViewTracker } from "@/components/notifications/profile-view-tracker";
 import { ProfilePageHeader } from "@/components/profile/profile-page-header";
 import {
   ProfileComingSoon,
@@ -271,6 +272,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
 
   return (
     <div className="bg-zinc-50">
+      <ProfileViewTracker profileId={profile.id} />
       <ProfilePageHeader
         profile={profile}
         connection={connection}

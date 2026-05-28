@@ -7,9 +7,19 @@ export type ConnectionStatus = "pending" | "accepted" | "declined" | "blocked";
 export type NotificationType =
   | "connection_request"
   | "connection_accepted"
-  | "new_message"
+  | "new_follower"
   | "profile_view"
+  | "new_message"
   | "mention"
+  | "reply"
+  | "community_invite"
+  | "community_event"
+  | "community_announcement"
+  | "business_inquiry"
+  | "partnership_request"
+  | "verification_approved"
+  | "admin_notice"
+  | "security_alert"
   | "system";
 
 export type RelationType =
@@ -117,10 +127,25 @@ export interface NotificationRow {
   actor_id: string | null;
   type: NotificationType;
   title: string;
-  body: string | null;
+  message: string | null;
   link: string | null;
+  image_url: string | null;
   is_read: boolean;
   created_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface NotificationPreferences {
+  user_id: string;
+  type_settings: Partial<Record<NotificationType, boolean>>;
+  email_enabled: boolean;
+  push_enabled: boolean;
+  sound_enabled: boolean;
+  updated_at: string;
+}
+
+export interface NotificationWithActor extends NotificationRow {
+  actor?: Pick<Profile, "id" | "username" | "full_name" | "avatar_url"> | null;
 }
 
 export interface ActivityLog {
@@ -240,6 +265,11 @@ export interface Database {
         };
         Update: Partial<NotificationRow>;
       };
+      notification_preferences: {
+        Row: NotificationPreferences;
+        Insert: Partial<NotificationPreferences> & { user_id: string };
+        Update: Partial<NotificationPreferences>;
+      };
       activity_logs: {
         Row: ActivityLog;
         Insert: Partial<ActivityLog> & { action: string };
@@ -258,6 +288,19 @@ export interface Database {
     };
     Functions: {
       is_admin: { Args: Record<string, never>; Returns: boolean };
+      create_notification: {
+        Args: {
+          p_user_id: string;
+          p_actor_id: string | null;
+          p_type: NotificationType;
+          p_title: string;
+          p_message?: string | null;
+          p_link?: string | null;
+          p_image_url?: string | null;
+          p_metadata?: Record<string, unknown> | null;
+        };
+        Returns: NotificationRow;
+      };
     };
     Enums: {
       user_role: UserRole;

@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { NotificationPreferencesForm } from "@/components/notifications/notification-preferences-form";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
+import { DEFAULT_NOTIFICATION_TYPE_SETTINGS } from "@/lib/notifications/constants";
 import { listRelations } from "@/services/relations";
+import { getNotificationPreferences } from "@/services/notifications";
 
 import { RelationsManager } from "./relations-manager";
 import { ProfileSettingsForm } from "./settings-form";
@@ -30,6 +33,7 @@ export default async function SettingsPage() {
     .maybeSingle();
 
   const relations = await listRelations(supabase, user.id);
+  const notificationPrefs = await getNotificationPreferences(supabase, user.id);
 
   if (!profile) redirect("/");
 
@@ -43,6 +47,19 @@ export default async function SettingsPage() {
       </header>
 
       <ProfileSettingsForm profile={profile} socials={socials} />
+
+      <NotificationPreferencesForm
+        initial={
+          notificationPrefs ?? {
+            user_id: user.id,
+            type_settings: DEFAULT_NOTIFICATION_TYPE_SETTINGS,
+            email_enabled: true,
+            push_enabled: false,
+            sound_enabled: true,
+            updated_at: new Date().toISOString(),
+          }
+        }
+      />
 
       <Card>
         <CardHeader>

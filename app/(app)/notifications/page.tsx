@@ -1,10 +1,10 @@
 import { Bell } from "lucide-react";
 import type { Metadata } from "next";
 
+import { NotificationCenter } from "@/components/notifications/notification-center";
 import { EmptyState } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
-
-import { NotificationList } from "./notification-list";
+import { listNotifications } from "@/services/notifications";
 
 export const metadata: Metadata = { title: "Notifications" };
 
@@ -14,30 +14,29 @@ export default async function NotificationsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data } = await supabase
-    .from("notifications")
-    .select("*")
-    .eq("user_id", user!.id)
-    .order("created_at", { ascending: false })
-    .limit(100);
+  const { data, total } = await listNotifications(supabase, user!.id, {
+    page: 1,
+  });
 
   return (
-    <div className="container py-8 lg:py-10 max-w-3xl space-y-4">
+    <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 lg:px-8 lg:py-10">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
-        <p className="text-sm text-ink-muted">
-          Stay on top of activity across your network.
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
+          Notifications
+        </h1>
+        <p className="text-sm text-zinc-500">
+          Stay on top of activity across your network in real time.
         </p>
       </header>
 
-      {(!data || data.length === 0) ? (
+      {data.length === 0 ? (
         <EmptyState
           icon={Bell}
           title="No notifications yet"
-          description="When activity happens we'll let you know here."
+          description="When activity happens, you'll see it here instantly."
         />
       ) : (
-        <NotificationList initial={data} />
+        <NotificationCenter initial={data} initialTotal={total} />
       )}
     </div>
   );

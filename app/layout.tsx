@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 
+import { NotificationProvider } from "@/components/notifications/notification-provider";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { SwRegister } from "@/components/pwa/sw-register";
 import { AuthProvider } from "@/components/providers/auth-provider";
@@ -85,7 +86,7 @@ export default async function RootLayout({
       <body>
         <ThemeProvider>
           <AuthProvider initialProfile={profile}>
-            {children}
+            <NotificationProvider>{children}</NotificationProvider>
             <ToastProvider />
             <InstallPrompt />
           </AuthProvider>
