@@ -29,7 +29,7 @@ interface Props {
 
 export function RelationsManager({ userId, initial }: Props) {
   const router = useRouter();
-  const supabase = React.useMemo(() => createClient(), []);
+  const supabase = createClient();
   const [items, setItems] = React.useState(initial);
   const [search, setSearch] = React.useState("");
   const [results, setResults] = React.useState<Profile[]>([]);

@@ -1,12 +1,19 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
+import {
+  removeProfileImageAction,
+  updateProfileAction,
+  updateSocialLinksAction,
+  uploadProfileImageAction,
+  type ProfileImageField,
+} from "@/lib/actions/profile";
+import { withActionTimeout } from "@/lib/client/with-action-timeout";
 import { ImageDropzone } from "@/components/profile/image-dropzone";
 import {
   Avatar,
@@ -18,19 +25,16 @@ import {
   Input,
   Textarea,
 } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import { compressAvatar, compressCover } from "@/lib/upload-image";
 import {
   normalizeProfileInput,
-  normalizeUrl,
+  normalizeSocialLinksInput,
   profileSchema,
   socialLinksSchema,
   type ProfileInput,
   type SocialLinksInput,
 } from "@/lib/validations";
 import { useAuthStore } from "@/store/auth-store";
-
-import { updateProfileAction } from "./actions";
 
 import type { Profile, SocialLinks } from "@/types/database";
 
@@ -39,7 +43,72 @@ interface Props {
   socials: SocialLinks | null;
 }
 
-const PROFILE_SAVE_TIMEOUT_MS = 20_000;
+const ACTION_TIMEOUT_MS = 20_000;
+
+type ProfileSnapshot = Pick<
+  Profile,
+  | "full_name"
+  | "username"
+  | "occupation"
+  | "company"
+  | "bio"
+  | "phone"
+  | "website"
+  | "address"
+  | "city"
+  | "country"
+>;
+
+function snapshotProfile(profile: Profile): ProfileSnapshot {
+  return {
+    full_name: profile.full_name,
+    username: profile.username,
+    occupation: profile.occupation,
+    company: profile.company,
+    bio: profile.bio,
+    phone: profile.phone,
+    website: profile.website,
+    address: profile.address,
+    city: profile.city,
+    country: profile.country,
+  };
+}
+
+function profileToFormValues(snapshot: ProfileSnapshot): ProfileInput {
+  return {
+    full_name: snapshot.full_name,
+    username: snapshot.username,
+    occupation: snapshot.occupation ?? "",
+    company: snapshot.company ?? "",
+    bio: snapshot.bio ?? "",
+    phone: snapshot.phone ?? "",
+    website: snapshot.website ?? "",
+    address: snapshot.address ?? "",
+    city: snapshot.city ?? "",
+    country: snapshot.country ?? "",
+  };
+}
+
+function socialsToFormValues(socials: SocialLinks | null): SocialLinksInput {
+  return {
+    facebook: socials?.facebook ?? "",
+    instagram: socials?.instagram ?? "",
+    tiktok: socials?.tiktok ?? "",
+    linkedin: socials?.linkedin ?? "",
+    whatsapp: socials?.whatsapp ?? "",
+    twitter: socials?.twitter ?? "",
+  };
+}
+
+function profileSaveErrorMessage(error: string): string {
+  if (/username|already taken/i.test(error)) {
+    return "That username is already taken — your changes were rolled back.";
+  }
+  if (/session|sign in|authenticated/i.test(error)) {
+    return error;
+  }
+  return `Could not save profile: ${error}`;
+}
 
 export function ProfileSettingsForm({ profile, socials }: Props) {
   const patchProfile = useAuthStore((s) => s.patchProfile);
@@ -48,40 +117,27 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   const [avatarUrl, setAvatarUrl] = React.useState(profile.avatar_url);
   const [coverUrl, setCoverUrl] = React.useState(profile.cover_url);
 
-  const supabase = React.useMemo(() => createClient(), []);
-
   const profileForm = useForm<ProfileInput>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
-      full_name: profile.full_name,
-      username: profile.username,
-      occupation: profile.occupation ?? "",
-      company: profile.company ?? "",
-      bio: profile.bio ?? "",
-      phone: profile.phone ?? "",
-      website: profile.website ?? "",
-      address: profile.address ?? "",
-      city: profile.city ?? "",
-      country: profile.country ?? "",
-    },
+    defaultValues: profileToFormValues(snapshotProfile(profile)),
   });
 
   const socialsForm = useForm<SocialLinksInput>({
     resolver: zodResolver(socialLinksSchema),
-    defaultValues: {
-      facebook: socials?.facebook ?? "",
-      instagram: socials?.instagram ?? "",
-      tiktok: socials?.tiktok ?? "",
-      linkedin: socials?.linkedin ?? "",
-      whatsapp: socials?.whatsapp ?? "",
-      twitter: socials?.twitter ?? "",
-    },
+    defaultValues: socialsToFormValues(socials),
   });
+
+  const applyProfileSnapshot = React.useCallback(
+    (snapshot: ProfileSnapshot) => {
+      patchProfile(snapshot as Partial<Profile>);
+      profileForm.reset(profileToFormValues(snapshot));
+    },
+    [patchProfile, profileForm],
+  );
 
   const uploadImage = async (
     file: File,
-    field: "avatar_url" | "cover_url",
-    bucket: "avatars" | "covers",
+    field: ProfileImageField,
   ) => {
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image file.");
@@ -94,9 +150,7 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
     let optimisticUrl: string | null = null;
 
     try {
-      // 1) Compress in a web worker (single pass) — fast, with live progress.
-      const compress =
-        field === "avatar_url" ? compressAvatar : compressCover;
+      const compress = field === "avatar_url" ? compressAvatar : compressCover;
       const optimized = await compress(file, (percent) => {
         if (percent < 100) {
           toast.loading(`Optimizing ${label}… ${Math.round(percent)}%`, {
@@ -105,62 +159,43 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
         }
       });
 
-      // 2) Optimistic local preview + immediate success toast — the user
-      //    sees their new image AND a "saved" confirmation the moment
-      //    compression finishes. The upload + DB write run silently in
-      //    the background.
       optimisticUrl = URL.createObjectURL(optimized);
       if (field === "avatar_url") setAvatarUrl(optimisticUrl);
       else setCoverUrl(optimisticUrl);
       patchProfile({ [field]: optimisticUrl } as Partial<Profile>);
 
+      toast.loading(`Uploading ${label}…`, { id: toastId });
+
+      const formData = new FormData();
+      formData.set("field", field);
+      formData.set("file", optimized, `${field}.webp`);
+
+      const result = await withActionTimeout(
+        uploadProfileImageAction(formData),
+        ACTION_TIMEOUT_MS,
+      );
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      if (field === "avatar_url") setAvatarUrl(result.data.publicUrl);
+      else setCoverUrl(result.data.publicUrl);
+      patchProfile({ [field]: result.data.publicUrl } as Partial<Profile>);
+
       toast.success(
         field === "avatar_url" ? "Avatar updated" : "Cover updated",
         { id: toastId },
       );
-
-      // 3) Background upload + DB update. Errors get their own toast.
-      const path = `${profile.id}/${field}-${Date.now()}.webp`;
-      const { error: uploadErr } = await supabase.storage
-        .from(bucket)
-        .upload(path, optimized, {
-          upsert: true,
-          cacheControl: "3600",
-          contentType: "image/webp",
-        });
-      if (uploadErr) throw uploadErr;
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from(bucket).getPublicUrl(path);
-
-      const { error: dbErr } = await supabase
-        .from("profiles")
-        .update({ [field]: publicUrl } as never)
-        .eq("id", profile.id);
-      if (dbErr) throw dbErr;
-
-      // 4) Silently swap optimistic blob URL → public CDN URL so the
-      //    image keeps working after this tab is closed or refreshed.
-      if (field === "avatar_url") setAvatarUrl(publicUrl);
-      else setCoverUrl(publicUrl);
-      patchProfile({ [field]: publicUrl } as Partial<Profile>);
-      // NOTE: deliberately no router.refresh() — zustand already holds
-      // the new URL and a Server Component refresh would just add
-      // 300–800 ms of jank for no visible change.
     } catch (err) {
-      // Roll back the optimistic preview so reality and UI agree.
       if (field === "avatar_url") setAvatarUrl(previousUrl);
       else setCoverUrl(previousUrl);
       patchProfile({ [field]: previousUrl } as Partial<Profile>);
 
       const message =
         err instanceof Error ? err.message : "Could not update image.";
-      toast.error(`${message} — please try again.`);
+      toast.error(`${message} — please try again.`, { id: toastId });
     } finally {
-      // Defer the blob URL revoke so any in-flight <Image> render that
-      // picked it up can finish before the browser invalidates the
-      // handle.
       if (optimisticUrl) {
         const url = optimisticUrl;
         setTimeout(() => URL.revokeObjectURL(url), 2000);
@@ -168,139 +203,61 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
     }
   };
 
-  const removeImage = async (field: "avatar_url" | "cover_url") => {
+  const removeImage = async (field: ProfileImageField) => {
     const previousUrl = field === "avatar_url" ? avatarUrl : coverUrl;
 
-    // OPTIMISTIC: clear locally and confirm immediately. The DB write
-    // happens in the background.
     if (field === "avatar_url") setAvatarUrl(null);
     else setCoverUrl(null);
     patchProfile({ [field]: null } as Partial<Profile>);
-    toast.success("Image removed");
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ [field]: null } as never)
-      .eq("id", profile.id);
+    const result = await withActionTimeout(
+      removeProfileImageAction(field),
+      ACTION_TIMEOUT_MS,
+    );
 
-    if (error) {
-      // Roll back so the UI matches the actual DB state.
-      if (field === "avatar_url") setAvatarUrl(previousUrl);
-      else setCoverUrl(previousUrl);
-      patchProfile({ [field]: previousUrl } as Partial<Profile>);
-      toast.error(error.message || "Could not remove image — please try again.");
+    if (result.success) {
+      toast.success("Image removed");
+      return;
     }
-  };
 
-  /** Convert empty strings to null and trim whitespace. */
-  const cleanString = (v: string | undefined | null): string | null => {
-    if (v == null) return null;
-    const trimmed = v.trim();
-    return trimmed.length > 0 ? trimmed : null;
+    if (field === "avatar_url") setAvatarUrl(previousUrl);
+    else setCoverUrl(previousUrl);
+    patchProfile({ [field]: previousUrl } as Partial<Profile>);
+    toast.error(result.error || "Could not remove image — please try again.");
   };
 
   const onSubmitProfile = async (values: ProfileInput) => {
     const normalized = normalizeProfileInput(values);
-
-    const previous = {
-      full_name: profile.full_name,
-      username: profile.username,
-      occupation: profile.occupation,
-      company: profile.company,
-      bio: profile.bio,
-      phone: profile.phone,
-      website: profile.website,
-      address: profile.address,
-      city: profile.city,
-      country: profile.country,
-    };
+    const previous = snapshotProfile(profile);
 
     setSavingProfile(true);
 
-    const safetyResetId = window.setTimeout(() => {
-      setSavingProfile(false);
-    }, PROFILE_SAVE_TIMEOUT_MS + 2_000);
-
     try {
       patchProfile(normalized as Partial<Profile>);
-      profileForm.reset({
-        full_name: normalized.full_name,
-        username: normalized.username,
-        occupation: normalized.occupation ?? "",
-        company: normalized.company ?? "",
-        bio: normalized.bio ?? "",
-        phone: normalized.phone ?? "",
-        website: normalized.website ?? "",
-        address: normalized.address ?? "",
-        city: normalized.city ?? "",
-        country: normalized.country ?? "",
-      });
+      profileForm.reset(profileToFormValues(normalized as ProfileSnapshot));
 
-      const result = await Promise.race([
+      const result = await withActionTimeout(
         updateProfileAction(values),
-        new Promise<{ success: false; error: string }>((resolve) =>
-          setTimeout(
-            () =>
-              resolve({
-                success: false,
-                error:
-                  "Profile save timed out — check your network or sign in again.",
-              }),
-            PROFILE_SAVE_TIMEOUT_MS,
-          ),
-        ),
-      ]);
+        ACTION_TIMEOUT_MS,
+      );
 
       if (result.success) {
         toast.success("Profile saved");
         return;
       }
 
-      patchProfile(previous as Partial<Profile>);
-      profileForm.reset({
-        full_name: previous.full_name,
-        username: previous.username,
-        occupation: previous.occupation ?? "",
-        company: previous.company ?? "",
-        bio: previous.bio ?? "",
-        phone: previous.phone ?? "",
-        website: previous.website ?? "",
-        address: previous.address ?? "",
-        city: previous.city ?? "",
-        country: previous.country ?? "",
-      });
-
-      toast.error(
-        result.error.includes("username")
-          ? "That username is already taken — your changes were rolled back."
-          : `Could not save profile: ${result.error}`,
-      );
+      applyProfileSnapshot(previous);
+      toast.error(profileSaveErrorMessage(result.error));
     } catch (error: unknown) {
-      patchProfile(previous as Partial<Profile>);
-      profileForm.reset({
-        full_name: previous.full_name,
-        username: previous.username,
-        occupation: previous.occupation ?? "",
-        company: previous.company ?? "",
-        bio: previous.bio ?? "",
-        phone: previous.phone ?? "",
-        website: previous.website ?? "",
-        address: previous.address ?? "",
-        city: previous.city ?? "",
-        country: previous.country ?? "",
-      });
-
+      applyProfileSnapshot(previous);
       const message =
-        error instanceof Error ? error.message : "Unknown save error";
-      toast.error(`Could not save profile: ${message}`);
+        error instanceof Error ? error.message : "Something went wrong.";
+      toast.error(profileSaveErrorMessage(message));
     } finally {
-      window.clearTimeout(safetyResetId);
       setSavingProfile(false);
     }
   };
 
-  /** Show the first Zod validation error in a toast so users never wonder
-   *  why the Save button "did nothing". */
   const onProfileFormError = (
     errors: typeof profileForm.formState.errors,
   ) => {
@@ -313,40 +270,35 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   };
 
   const onSubmitSocials = async (values: SocialLinksInput) => {
-    // Always save on click. Keep social links form state normalized and
-    // optimistic just like the profile form.
-
-    const payload = {
-      profile_id: profile.id,
-      facebook: normalizeUrl(values.facebook),
-      instagram: normalizeUrl(values.instagram),
-      tiktok: normalizeUrl(values.tiktok),
-      linkedin: normalizeUrl(values.linkedin),
-      whatsapp: cleanString(values.whatsapp),
-      twitter: normalizeUrl(values.twitter),
-    };
-
-    // Optimistic UI — reset the form to the normalized values and tell the
-    // user it's saved right away. The actual upsert finishes in the
-    // background and only surfaces if it fails.
-    socialsForm.reset({
-      facebook: payload.facebook ?? "",
-      instagram: payload.instagram ?? "",
-      tiktok: payload.tiktok ?? "",
-      linkedin: payload.linkedin ?? "",
-      whatsapp: payload.whatsapp ?? "",
-      twitter: payload.twitter ?? "",
-    });
-    toast.success("Social links saved");
+    const previous = socialsToFormValues(socials);
+    const normalized = normalizeSocialLinksInput(values, profile.id);
 
     setSavingSocials(true);
-    const { error } = await supabase
-      .from("social_links")
-      .upsert(payload as never, { onConflict: "profile_id" });
-    setSavingSocials(false);
 
-    if (error) {
-      toast.error(error.message || "Could not save links — please try again.");
+    try {
+      socialsForm.reset({
+        facebook: normalized.facebook ?? "",
+        instagram: normalized.instagram ?? "",
+        tiktok: normalized.tiktok ?? "",
+        linkedin: normalized.linkedin ?? "",
+        whatsapp: normalized.whatsapp ?? "",
+        twitter: normalized.twitter ?? "",
+      });
+
+      const result = await withActionTimeout(
+        updateSocialLinksAction(values),
+        ACTION_TIMEOUT_MS,
+      );
+
+      if (result.success) {
+        toast.success("Social links saved");
+        return;
+      }
+
+      socialsForm.reset(previous);
+      toast.error(result.error || "Could not save links — please try again.");
+    } finally {
+      setSavingSocials(false);
     }
   };
 
@@ -369,7 +321,7 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
           hasImage={Boolean(coverUrl)}
           changeLabel="Change cover"
           emptyHint="Drop a cover image here"
-          onUpload={(f) => uploadImage(f, "cover_url", "covers")}
+          onUpload={(f) => uploadImage(f, "cover_url")}
           onRemove={coverUrl ? () => removeImage("cover_url") : undefined}
           className="h-36 sm:h-44 w-full overflow-hidden bg-gradient-to-br from-brand-500 to-brand-700 !rounded-none"
           actionsClassName="right-4 top-4"
@@ -391,7 +343,7 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
             compact
             hasImage={Boolean(avatarUrl)}
             changeLabel="Change avatar"
-            onUpload={(f) => uploadImage(f, "avatar_url", "avatars")}
+            onUpload={(f) => uploadImage(f, "avatar_url")}
             onRemove={avatarUrl ? () => removeImage("avatar_url") : undefined}
             className="shrink-0"
             actionsClassName="-bottom-1 -right-1"
@@ -431,20 +383,9 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
             <Textarea label="Bio" rows={4} {...profileForm.register("bio")} error={profileForm.formState.errors.bio?.message} />
           </div>
           <div className="sm:col-span-2 flex justify-end">
-            <button
-              type="submit"
-              disabled={savingProfile}
-              className="inline-flex items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-            >
-              {savingProfile ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save changes"
-              )}
-            </button>
+            <Button type="submit" loading={savingProfile}>
+              Save changes
+            </Button>
           </div>
         </form>
       </Card>

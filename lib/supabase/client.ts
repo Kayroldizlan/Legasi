@@ -3,12 +3,11 @@
 import { createBrowserClient } from "@supabase/ssr";
 
 /**
- * Browser-side Supabase client (singleton).
+ * Shared browser Supabase client (singleton).
  *
- * Creating a new client on every call causes multiple auth lock
- * contenders and can hang `getSession()` / `.update()` indefinitely
- * when AuthProvider, settings form, and other components each spin up
- * their own instance.
+ * Import `createClient()` wherever browser-side Supabase is needed
+ * (realtime, auth listeners, chat). Do not call `createBrowserClient`
+ * directly and do not wrap in `useMemo` — this module caches one instance.
  */
 let browserClient: ReturnType<typeof createBrowserClient> | undefined;
 
@@ -22,3 +21,6 @@ export function createClient() {
 
   return browserClient;
 }
+
+/** Alias for readability in modules that only need the shared instance. */
+export const getSupabaseBrowserClient = createClient;

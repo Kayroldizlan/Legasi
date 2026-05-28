@@ -13,7 +13,7 @@ import type { Banner } from "@/types/database";
 
 export function BannerManager({ initial }: { initial: Banner[] }) {
   const router = useRouter();
-  const supabase = React.useMemo(() => createClient(), []);
+  const supabase = createClient();
   const [items, setItems] = React.useState(initial);
   const [title, setTitle] = React.useState("");
   const [body, setBody] = React.useState("");

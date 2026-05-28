@@ -134,6 +134,26 @@ export function normalizeProfileInput(input: ProfileInput) {
 
 export type NormalizedProfileInput = ReturnType<typeof normalizeProfileInput>;
 
+/** Normalize social link form values for DB storage. */
+export function normalizeSocialLinksInput(
+  input: SocialLinksInput,
+  profileId: string,
+) {
+  return {
+    profile_id: profileId,
+    facebook: normalizeUrl(input.facebook),
+    instagram: normalizeUrl(input.instagram),
+    tiktok: normalizeUrl(input.tiktok),
+    linkedin: normalizeUrl(input.linkedin),
+    whatsapp: cleanOptionalString(input.whatsapp),
+    twitter: normalizeUrl(input.twitter),
+  };
+}
+
+export type NormalizedSocialLinksInput = ReturnType<
+  typeof normalizeSocialLinksInput
+>;
+
 export const messageSchema = z.object({
   message: z.string().min(1, "Type something").max(2000),
 });

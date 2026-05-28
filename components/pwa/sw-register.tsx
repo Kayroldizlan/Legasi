@@ -2,25 +2,13 @@
 
 import { useEffect } from "react";
 
-/**
- * Registers the Serwist-generated service worker in production.
- */
+/** Register the Serwist service worker in production builds. */
 export function SwRegister() {
   useEffect(() => {
-    // TEMP (debugging profile save flow): disable SW caching in all
-    // environments and actively unregister existing workers to avoid
-    // serving stale JS bundles.
+    if (process.env.NODE_ENV !== "production") return;
     if (!("serviceWorker" in navigator)) return;
 
-    void (async () => {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
-
-      if ("caches" in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-      }
-    })();
+    void navigator.serviceWorker.register("/sw.js", { scope: "/" });
   }, []);
 
   return null;

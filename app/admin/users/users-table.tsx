@@ -28,7 +28,7 @@ export function UserAdminTable({ initial, initialQuery, initialStatus }: Props) 
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const supabase = React.useMemo(() => createClient(), []);
+  const supabase = createClient();
 
   const [items, setItems] = React.useState(initial);
   const [q, setQ] = React.useState(initialQuery);

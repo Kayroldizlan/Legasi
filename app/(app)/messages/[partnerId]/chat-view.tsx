@@ -28,7 +28,7 @@ export function ChatView({
   const [partnerTyping, setPartnerTyping] = React.useState(false);
   const [partnerOnline, setPartnerOnline] = React.useState(partner.is_online);
   const endRef = React.useRef<HTMLDivElement>(null);
-  const supabase = React.useMemo(() => createClient(), []);
+  const supabase = createClient();
 
   React.useEffect(() => {
     const el = endRef.current;

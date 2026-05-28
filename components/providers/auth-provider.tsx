@@ -2,10 +2,13 @@
 
 import * as React from "react";
 
+import { updatePresenceAction } from "@/lib/actions/profile";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/store/auth-store";
 
 import type { Profile } from "@/types/database";
+
+const PRESENCE_INTERVAL_MS = 60_000;
 
 export function AuthProvider({
   initialProfile,
@@ -39,33 +42,25 @@ export function AuthProvider({
     return () => data.subscription.unsubscribe();
   }, [setProfile]);
 
-  // Heartbeat: keep last_seen_at fresh while the tab is visible
   React.useEffect(() => {
     if (!initialProfile) return;
-    const supabase = createClient();
+
     const ping = () => {
-      void supabase
-        .from("profiles")
-        .update({ is_online: true, last_seen_at: new Date().toISOString() } as never)
-        .eq("id", initialProfile.id);
+      void updatePresenceAction(true);
     };
+
     ping();
-    const interval = setInterval(ping, 60_000);
+    const interval = setInterval(ping, PRESENCE_INTERVAL_MS);
 
     const onVisibility = () => {
-      if (document.visibilityState === "hidden") {
-        void supabase
-          .from("profiles")
-          .update({ is_online: false } as never)
-          .eq("id", initialProfile.id);
-      } else {
-        ping();
-      }
+      void updatePresenceAction(document.visibilityState !== "hidden");
     };
+
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibility);
+      void updatePresenceAction(false);
     };
   }, [initialProfile]);
 
