@@ -194,23 +194,10 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   };
 
   const onSubmitProfile = async (values: ProfileInput) => {
-    // IMPORTANT: do NOT short-circuit on `formState.isDirty` here.
-    //
-    // React Hook Form's `formState` is a Proxy that lazily computes derived
-    // flags (`isDirty`, `dirtyFields`, etc.) only when a component
-    // subscribes to them DURING RENDER. Reading `formState.isDirty` only
-    // inside this submit handler does not register a subscription, so RHF
-    // never recomputes it and the flag is permanently stuck at `false` —
-    // which is exactly the bug that caused "Nothing to save" to appear
-    // after legitimate edits.
-    //
-    // The user's intent is clear: they clicked Save Changes. So we always
-    // run the save. PostgREST will accept identical values without error,
-    // and the optimistic UI + form.reset() below keep everything in sync.
-    //
-    // Image changes (avatar / cover) are NOT routed through this handler.
-    // They save themselves the moment the user picks or removes a file
-    // inside `uploadImage` / `removeImage`, with their own optimistic UI.
+    // Image changes (avatar / cover) are saved independently by
+    // uploadImage/removeImage. This handler always executes the profile
+    // UPDATE query when Save Changes is clicked.
+    console.log("SAVE CLICKED");
 
     const normalized = {
       full_name: values.full_name.trim(),
@@ -260,6 +247,7 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
 
     // Background verification. The Save button is briefly disabled to
     // prevent rapid double-submits.
+    console.log("PROFILE UPDATE RUNNING");
     setSavingProfile(true);
     const { error } = await supabase
       .from("profiles")
@@ -267,7 +255,10 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       .eq("id", profile.id);
     setSavingProfile(false);
 
-    if (!error) return;
+    if (!error) {
+      console.log("SUPABASE UPDATE SUCCESS");
+      return;
+    }
 
     // Roll the optimistic update back to match the actual DB state.
     patchProfile(previous as Partial<Profile>);
@@ -284,6 +275,7 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       country: previous.country ?? "",
     });
 
+    console.log("SUPABASE UPDATE ERROR", error);
     if (
       error.code === "23505" ||
       /duplicate key|unique constraint/i.test(error.message)
@@ -312,11 +304,8 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   };
 
   const onSubmitSocials = async (values: SocialLinksInput) => {
-    // See the long note in `onSubmitProfile` — RHF's `formState.isDirty`
-    // requires a render-time subscription, and reading it only here would
-    // leave it permanently `false`. Always perform the save when the user
-    // clicks; identical-value upserts are accepted by Supabase and the
-    // optimistic UI + reset below keep state in sync.
+    // Always save on click. Keep social links form state normalized and
+    // optimistic just like the profile form.
 
     const payload = {
       profile_id: profile.id,

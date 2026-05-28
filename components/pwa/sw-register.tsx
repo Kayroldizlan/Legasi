@@ -7,12 +7,20 @@ import { useEffect } from "react";
  */
 export function SwRegister() {
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") return;
+    // TEMP (debugging profile save flow): disable SW caching in all
+    // environments and actively unregister existing workers to avoid
+    // serving stale JS bundles.
     if (!("serviceWorker" in navigator)) return;
 
-    navigator.serviceWorker
-      .register("/sw.js", { scope: "/" })
-      .catch((err) => console.error("SW registration failed:", err));
+    void (async () => {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    })();
   }, []);
 
   return null;

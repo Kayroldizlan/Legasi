@@ -33,8 +33,9 @@ const nextConfig = {
 const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
-  // Service worker is disabled in dev to avoid caching confusion.
-  disable: process.env.NODE_ENV === "development",
+  // TEMP (debugging profile save flow): disable service worker generation
+  // in both development and production to rule out stale cached bundles.
+  disable: true,
 });
 
 export default withSerwist(nextConfig);
