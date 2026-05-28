@@ -2,10 +2,12 @@
 
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import * as React from "react";
 
 import { Avatar, LinkButton } from "@/components/ui";
 import { NAV_LINKS_PUBLIC } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 
 import { Logo } from "./logo";
@@ -13,19 +15,33 @@ import { ThemeToggle } from "./theme-toggle";
 
 export function PublicNavbar() {
   const profile = useAuthStore((s) => s.profile);
+  const pathname = usePathname();
   const [open, setOpen] = React.useState(false);
+  const isAbout = pathname === "/about";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-surface/80 backdrop-blur">
+    <header
+      className={cn(
+        "sticky top-0 z-40 border-b backdrop-blur",
+        isAbout
+          ? "border-white/10 bg-[#050505]/85"
+          : "border-border bg-surface/80",
+      )}
+    >
       <div className="container flex h-16 items-center justify-between gap-4">
-        <Logo />
+        <Logo inverted={isAbout} />
 
         <nav className="hidden md:flex items-center gap-1">
           {NAV_LINKS_PUBLIC.map((l) => (
             <Link
               key={l.href}
               href={l.href}
-              className="px-3 py-2 text-sm font-medium text-ink-muted rounded-lg hover:bg-surface-subtle hover:text-ink transition"
+              className={cn(
+                "px-3 py-2 text-sm font-medium rounded-lg transition",
+                isAbout
+                  ? "text-zinc-400 hover:bg-white/5 hover:text-white"
+                  : "text-ink-muted hover:bg-surface-subtle hover:text-ink",
+              )}
             >
               {l.label}
             </Link>
@@ -33,7 +49,7 @@ export function PublicNavbar() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <ThemeToggle />
+          {!isAbout && <ThemeToggle />}
           {profile ? (
             <LinkButton
               href="/dashboard"
@@ -50,17 +66,28 @@ export function PublicNavbar() {
                 href="/login"
                 variant="ghost"
                 size="sm"
-                className="hidden sm:inline-flex"
+                className={cn(
+                  "hidden sm:inline-flex",
+                  isAbout && "text-zinc-300 hover:bg-white/10 hover:text-white",
+                )}
               >
-                Sign in
+                Log in
               </LinkButton>
-              <LinkButton href="/register" variant="primary" size="sm">
-                Get started
+              <LinkButton
+                href="/register"
+                variant="primary"
+                size="sm"
+                className={isAbout ? "shadow-[0_0_20px_rgb(239_68_68/0.2)]" : undefined}
+              >
+                Join Legasi
               </LinkButton>
             </>
           )}
           <button
-            className="md:hidden ml-1 flex h-9 w-9 items-center justify-center rounded-xl border border-border"
+            className={cn(
+              "md:hidden ml-1 flex h-9 w-9 items-center justify-center rounded-xl border",
+              isAbout ? "border-white/15 text-white" : "border-border",
+            )}
             onClick={() => setOpen(!open)}
             aria-label="Menu"
           >
@@ -70,13 +97,25 @@ export function PublicNavbar() {
       </div>
 
       {open && (
-        <nav className="md:hidden border-t border-border bg-surface px-4 py-3 space-y-1">
+        <nav
+          className={cn(
+            "md:hidden border-t px-4 py-3 space-y-1",
+            isAbout
+              ? "border-white/10 bg-[#050505]"
+              : "border-border bg-surface",
+          )}
+        >
           {NAV_LINKS_PUBLIC.map((l) => (
             <Link
               key={l.href}
               href={l.href}
               onClick={() => setOpen(false)}
-              className="block px-3 py-2 rounded-lg text-sm font-medium text-ink-muted hover:bg-surface-subtle hover:text-ink"
+              className={cn(
+                "block px-3 py-2 rounded-lg text-sm font-medium",
+                isAbout
+                  ? "text-zinc-400 hover:bg-white/5 hover:text-white"
+                  : "text-ink-muted hover:bg-surface-subtle hover:text-ink",
+              )}
             >
               {l.label}
             </Link>
