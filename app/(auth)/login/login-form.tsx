@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
 import { Button, Input } from "@/components/ui";
+import { sanitizeNextPath } from "@/lib/auth/routes";
 import { APP_NAME } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 import { loginSchema, type LoginInput } from "@/lib/validations";
@@ -39,7 +40,7 @@ export function LoginForm({ next }: { next?: string }) {
       return;
     }
     toast.success("Welcome back");
-    router.push(next || "/dashboard");
+    router.push(sanitizeNextPath(next));
     router.refresh();
   };
 

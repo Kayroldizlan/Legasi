@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 
+import { sanitizeNextPath } from "@/lib/auth/routes";
 import { createClient } from "@/lib/supabase/server";
 
 /**
  * Supabase OAuth / email-confirm callback.
- * Exchanges the temporary code for a session, then redirects to /dashboard
- * (or `?next=`).
+ * Exchanges the temporary code for a session, then redirects to /directory
+ * (or a safe `?next=` path).
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+  const next = sanitizeNextPath(searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();

@@ -4,6 +4,7 @@ import * as React from "react";
 import toast from "react-hot-toast";
 
 import { Button } from "@/components/ui";
+import { AUTH_DEFAULT_REDIRECT } from "@/lib/auth/routes";
 import { createClient } from "@/lib/supabase/client";
 
 export function GoogleButton({ label = "Continue with Google" }: { label?: string }) {
@@ -15,7 +16,7 @@ export function GoogleButton({ label = "Continue with Google" }: { label?: strin
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(AUTH_DEFAULT_REDIRECT)}`,
       },
     });
     if (error) {

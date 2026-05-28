@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
 import { Button, Input } from "@/components/ui";
+import { AUTH_DEFAULT_REDIRECT } from "@/lib/auth/routes";
 import { APP_NAME } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 import { registerSchema, type RegisterInput } from "@/lib/validations";
@@ -36,7 +37,7 @@ export function RegisterForm() {
       email: values.email,
       password: values.password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(AUTH_DEFAULT_REDIRECT)}`,
         data: {
           full_name: values.full_name,
           username: values.username.toLowerCase(),

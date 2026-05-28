@@ -1,9 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
+import {
+  AUTH_DEFAULT_REDIRECT,
+  AUTH_LOGIN_PATH,
+  isAuthGuestRoute,
+  isPrivateRoute,
+} from "@/lib/auth/routes";
+
 /**
- * Refresh the Supabase auth session on every request and enforce
- * role-based route protection.
+ * Refresh the Supabase auth session on every request and enforce route rules.
+ *
+ * - Private routes → /login when unauthenticated
+ * - / + auth pages → /directory when authenticated
+ * - Session cookies refreshed for PWA / mobile persistence
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -35,22 +45,13 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  const isPrivate =
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/messages") ||
-    pathname.startsWith("/notifications") ||
-    pathname.startsWith("/connections") ||
-    pathname.startsWith("/settings") ||
-    pathname.startsWith("/admin");
-
-  if (isPrivate && !user) {
+  if (isPrivateRoute(pathname) && !user) {
     const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
+    loginUrl.pathname = AUTH_LOGIN_PATH;
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Admin guard
   if (pathname.startsWith("/admin") && user) {
     const { data: profile } = await supabase
       .from("profiles")
@@ -59,22 +60,17 @@ export async function updateSession(request: NextRequest) {
       .maybeSingle();
 
     if (profile?.role !== "admin") {
-      const home = request.nextUrl.clone();
-      home.pathname = "/dashboard";
-      return NextResponse.redirect(home);
+      const fallback = request.nextUrl.clone();
+      fallback.pathname = AUTH_DEFAULT_REDIRECT;
+      return NextResponse.redirect(fallback);
     }
   }
 
-  // Redirect logged-in users away from auth pages
-  if (
-    user &&
-    (pathname === "/login" ||
-      pathname === "/register" ||
-      pathname === "/forgot-password")
-  ) {
-    const dashboard = request.nextUrl.clone();
-    dashboard.pathname = "/dashboard";
-    return NextResponse.redirect(dashboard);
+  if (user && (pathname === "/" || isAuthGuestRoute(pathname))) {
+    const destination = request.nextUrl.clone();
+    destination.pathname = AUTH_DEFAULT_REDIRECT;
+    destination.search = "";
+    return NextResponse.redirect(destination);
   }
 
   return supabaseResponse;

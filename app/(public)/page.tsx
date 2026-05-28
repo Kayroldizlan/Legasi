@@ -8,9 +8,11 @@ import {
   UsersRound,
 } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { Footer } from "@/components/layout/footer";
 import { Avatar, Badge, LinkButton } from "@/components/ui";
+import { AUTH_DEFAULT_REDIRECT } from "@/lib/auth/routes";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 
@@ -25,6 +27,13 @@ type FeaturedProfile = Pick<
 
 export default async function HomePage() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect(AUTH_DEFAULT_REDIRECT);
+  }
 
   const [{ count: profilesCount }, featuredRes] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }).eq("status", "approved"),
