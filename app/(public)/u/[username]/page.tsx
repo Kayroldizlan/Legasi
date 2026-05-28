@@ -177,7 +177,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
             />
           )}
           {profile.address && (
-            <MetaRow icon={MapPin} label="Address" value={profile.address} />
+            <MetaRow icon={MapPin} label="State" value={profile.address} />
           )}
         </div>
       </section>

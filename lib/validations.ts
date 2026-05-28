@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import { MALAYSIAN_STATES } from "@/lib/constants";
+import {
+  socialUsernameToUrl,
+} from "@/lib/social-platforms";
+
 /**
  * Accepts an optional URL with or without an explicit protocol.
  *
@@ -82,19 +87,37 @@ export const profileSchema = z.object({
   bio: z.string().max(500).optional().or(z.literal("")),
   phone: z.string().max(32).optional().or(z.literal("")),
   website: lenientUrlField,
-  address: z.string().max(180).optional().or(z.literal("")),
+  address: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine(
+      (value) =>
+        !value ||
+        (MALAYSIAN_STATES as readonly string[]).includes(value),
+      { message: "Select a valid Malaysian state." },
+    ),
   city: z.string().max(80).optional().or(z.literal("")),
   country: z.string().max(80).optional().or(z.literal("")),
 });
 export type ProfileInput = z.infer<typeof profileSchema>;
 
+const socialUsernameField = z
+  .string()
+  .max(80)
+  .optional()
+  .or(z.literal(""))
+  .refine((value) => !value || !/[\s/?#]/.test(value), {
+    message: "Enter a valid username.",
+  });
+
 export const socialLinksSchema = z.object({
-  facebook: lenientUrlField,
-  instagram: lenientUrlField,
-  tiktok: lenientUrlField,
-  linkedin: lenientUrlField,
-  whatsapp: z.string().optional().or(z.literal("")),
-  twitter: lenientUrlField,
+  facebook: socialUsernameField,
+  instagram: socialUsernameField,
+  tiktok: socialUsernameField,
+  linkedin: socialUsernameField,
+  whatsapp: z.string().max(32).optional().or(z.literal("")),
+  twitter: socialUsernameField,
 });
 export type SocialLinksInput = z.infer<typeof socialLinksSchema>;
 
@@ -141,12 +164,12 @@ export function normalizeSocialLinksInput(
 ) {
   return {
     profile_id: profileId,
-    facebook: normalizeUrl(input.facebook),
-    instagram: normalizeUrl(input.instagram),
-    tiktok: normalizeUrl(input.tiktok),
-    linkedin: normalizeUrl(input.linkedin),
+    facebook: socialUsernameToUrl(input.facebook, "facebook"),
+    instagram: socialUsernameToUrl(input.instagram, "instagram"),
+    tiktok: socialUsernameToUrl(input.tiktok, "tiktok"),
+    linkedin: socialUsernameToUrl(input.linkedin, "linkedin"),
     whatsapp: cleanOptionalString(input.whatsapp),
-    twitter: normalizeUrl(input.twitter),
+    twitter: socialUsernameToUrl(input.twitter, "twitter"),
   };
 }
 

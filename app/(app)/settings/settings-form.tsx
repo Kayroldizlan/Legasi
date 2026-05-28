@@ -23,12 +23,18 @@ import {
   CardHeader,
   CardTitle,
   Input,
+  Select,
   Textarea,
 } from "@/components/ui";
+import { MALAYSIAN_STATES } from "@/lib/constants";
+import {
+  SOCIAL_PLATFORMS,
+  socialUrlToUsername,
+  type SocialPlatformKey,
+} from "@/lib/social-platforms";
 import { compressAvatar, compressCover } from "@/lib/upload-image";
 import {
   normalizeProfileInput,
-  normalizeSocialLinksInput,
   profileSchema,
   socialLinksSchema,
   type ProfileInput,
@@ -91,12 +97,12 @@ function profileToFormValues(snapshot: ProfileSnapshot): ProfileInput {
 
 function socialsToFormValues(socials: SocialLinks | null): SocialLinksInput {
   return {
-    facebook: socials?.facebook ?? "",
-    instagram: socials?.instagram ?? "",
-    tiktok: socials?.tiktok ?? "",
-    linkedin: socials?.linkedin ?? "",
+    linkedin: socialUrlToUsername(socials?.linkedin, "linkedin"),
+    twitter: socialUrlToUsername(socials?.twitter, "twitter"),
+    facebook: socialUrlToUsername(socials?.facebook, "facebook"),
+    instagram: socialUrlToUsername(socials?.instagram, "instagram"),
+    tiktok: socialUrlToUsername(socials?.tiktok, "tiktok"),
     whatsapp: socials?.whatsapp ?? "",
-    twitter: socials?.twitter ?? "",
   };
 }
 
@@ -271,19 +277,11 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
 
   const onSubmitSocials = async (values: SocialLinksInput) => {
     const previous = socialsToFormValues(socials);
-    const normalized = normalizeSocialLinksInput(values, profile.id);
 
     setSavingSocials(true);
 
     try {
-      socialsForm.reset({
-        facebook: normalized.facebook ?? "",
-        instagram: normalized.instagram ?? "",
-        tiktok: normalized.tiktok ?? "",
-        linkedin: normalized.linkedin ?? "",
-        whatsapp: normalized.whatsapp ?? "",
-        twitter: normalized.twitter ?? "",
-      });
+      socialsForm.reset(values);
 
       const result = await withActionTimeout(
         updateSocialLinksAction(values),
@@ -377,7 +375,18 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
           <Input label="City" {...profileForm.register("city")} />
           <Input label="Country" {...profileForm.register("country")} />
           <div className="sm:col-span-2">
-            <Input label="Address" {...profileForm.register("address")} />
+            <Select
+              label="State"
+              {...profileForm.register("address")}
+              error={profileForm.formState.errors.address?.message}
+            >
+              <option value="">Select state</option>
+              {MALAYSIAN_STATES.map((state) => (
+                <option key={state} value={state}>
+                  {state}
+                </option>
+              ))}
+            </Select>
           </div>
           <div className="sm:col-span-2">
             <Textarea label="Bio" rows={4} {...profileForm.register("bio")} error={profileForm.formState.errors.bio?.message} />
@@ -393,18 +402,29 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Social links</CardTitle>
-          <CardDescription>Help people find you across the web.</CardDescription>
+          <CardDescription>
+            Enter your username — we&apos;ll add the platform link for you.
+          </CardDescription>
         </CardHeader>
         <form
           onSubmit={socialsForm.handleSubmit(onSubmitSocials, onSocialsFormError)}
           className="grid gap-4 sm:grid-cols-2"
         >
-          <Input label="LinkedIn" placeholder="https://linkedin.com/in/…" {...socialsForm.register("linkedin")} error={socialsForm.formState.errors.linkedin?.message} />
-          <Input label="X / Twitter" placeholder="https://x.com/…" {...socialsForm.register("twitter")} error={socialsForm.formState.errors.twitter?.message} />
-          <Input label="Facebook" placeholder="https://facebook.com/…" {...socialsForm.register("facebook")} error={socialsForm.formState.errors.facebook?.message} />
-          <Input label="Instagram" placeholder="https://instagram.com/…" {...socialsForm.register("instagram")} error={socialsForm.formState.errors.instagram?.message} />
-          <Input label="TikTok" placeholder="https://tiktok.com/@…" {...socialsForm.register("tiktok")} error={socialsForm.formState.errors.tiktok?.message} />
-          <Input label="WhatsApp number" placeholder="+1234567890" {...socialsForm.register("whatsapp")} />
+          {(Object.keys(SOCIAL_PLATFORMS) as SocialPlatformKey[]).map((key) => {
+            const platform = SOCIAL_PLATFORMS[key];
+            return (
+              <Input
+                key={key}
+                label={platform.label}
+                prefix={platform.prefix}
+                placeholder={platform.placeholder}
+                autoComplete="off"
+                {...socialsForm.register(key)}
+                error={socialsForm.formState.errors[key]?.message}
+              />
+            );
+          })}
+          <Input label="WhatsApp number" placeholder="+60123456789" {...socialsForm.register("whatsapp")} />
           <div className="sm:col-span-2 flex justify-end">
             <Button type="submit" loading={savingSocials}>Save social links</Button>
           </div>

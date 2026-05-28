@@ -5,6 +5,26 @@ export const APP_NAME = "Legasi";
 export const LOGO_WORDMARK = "The Legasi";
 export const APP_TAGLINE = "Where professionals connect, collaborate, and grow.";
 
+/** 13 states + Wilayah Persekutuan (Malaysia). */
+export const MALAYSIAN_STATES = [
+  "Johor",
+  "Kedah",
+  "Kelantan",
+  "Melaka",
+  "Negeri Sembilan",
+  "Pahang",
+  "Perak",
+  "Perlis",
+  "Pulau Pinang",
+  "Sabah",
+  "Sarawak",
+  "Selangor",
+  "Terengganu",
+  "Wilayah Persekutuan",
+] as const;
+
+export type MalaysianState = (typeof MALAYSIAN_STATES)[number];
+
 export const RELATION_TYPES: RelationType[] = [
   "sibling",
   "parent",
