@@ -446,16 +446,20 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
             <Textarea label="Bio" rows={4} {...profileForm.register("bio")} error={profileForm.formState.errors.bio?.message} />
           </div>
           <div className="sm:col-span-2 flex justify-end">
-            <Button type="submit" disabled={savingProfile}>
+            <button
+              type="submit"
+              disabled={savingProfile}
+              className="inline-flex items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
               {savingProfile ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Saving...
                 </>
               ) : (
                 "Save changes"
               )}
-            </Button>
+            </button>
           </div>
         </form>
       </Card>
