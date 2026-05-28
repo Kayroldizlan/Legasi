@@ -100,12 +100,30 @@ interface TextareaProps
   label?: string;
   hint?: string;
   error?: string;
+  showCount?: boolean;
+  valueLength?: number;
 }
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, label, hint, error, id, rows = 4, ...props }, ref) => {
+  (
+    {
+      className,
+      label,
+      hint,
+      error,
+      showCount,
+      valueLength = 0,
+      id,
+      rows = 4,
+      maxLength,
+      ...props
+    },
+    ref,
+  ) => {
     const generatedId = React.useId();
     const inputId = id || generatedId;
+    const showCounter = showCount && maxLength != null;
+
     return (
       <div className="space-y-1.5">
         {label && (
@@ -117,6 +135,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           id={inputId}
           ref={ref}
           rows={rows}
+          maxLength={maxLength}
           className={cn(
             "input-base resize-y",
             error && "border-red-500 focus:border-red-500 focus:ring-red-500/20",
@@ -124,10 +143,26 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           )}
           {...props}
         />
-        {error ? (
-          <p className="text-xs text-red-600">{error}</p>
-        ) : hint ? (
-          <p className="text-xs text-ink-subtle">{hint}</p>
+        {error || hint || showCounter ? (
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              {error ? (
+                <p className="text-xs text-red-600">{error}</p>
+              ) : hint ? (
+                <p className="text-xs text-ink-subtle">{hint}</p>
+              ) : null}
+            </div>
+            {showCounter ? (
+              <p
+                className={cn(
+                  "shrink-0 text-xs tabular-nums",
+                  valueLength >= maxLength ? "text-red-600" : "text-ink-subtle",
+                )}
+              >
+                {valueLength}/{maxLength}
+              </p>
+            ) : null}
+          </div>
         ) : null}
       </div>
     );

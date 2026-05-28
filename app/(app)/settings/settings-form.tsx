@@ -35,6 +35,7 @@ import {
 import { compressAvatar, compressCover } from "@/lib/upload-image";
 import {
   normalizeProfileInput,
+  PROFILE_BIO_MAX_LENGTH,
   profileSchema,
   socialLinksSchema,
   type ProfileInput,
@@ -127,6 +128,7 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
     resolver: zodResolver(profileSchema),
     defaultValues: profileToFormValues(snapshotProfile(profile)),
   });
+  const bioLength = (profileForm.watch("bio") ?? "").length;
 
   const socialsForm = useForm<SocialLinksInput>({
     resolver: zodResolver(socialLinksSchema),
@@ -389,7 +391,15 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
             </Select>
           </div>
           <div className="sm:col-span-2">
-            <Textarea label="Bio" rows={4} {...profileForm.register("bio")} error={profileForm.formState.errors.bio?.message} />
+            <Textarea
+              label="Bio"
+              rows={4}
+              maxLength={PROFILE_BIO_MAX_LENGTH}
+              showCount
+              valueLength={bioLength}
+              {...profileForm.register("bio")}
+              error={profileForm.formState.errors.bio?.message}
+            />
           </div>
           <div className="sm:col-span-2 flex justify-end">
             <Button type="submit" loading={savingProfile}>

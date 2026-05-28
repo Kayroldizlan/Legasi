@@ -73,6 +73,8 @@ export const resetPasswordSchema = z
   });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
+export const PROFILE_BIO_MAX_LENGTH = 999;
+
 export const profileSchema = z.object({
   full_name: z.string().min(2, "Full name is required."),
   username: z
@@ -84,7 +86,13 @@ export const profileSchema = z.object({
     .regex(/^[a-z0-9_]+$/, "Use lowercase letters, numbers, and underscores."),
   occupation: z.string().max(120).optional().or(z.literal("")),
   company: z.string().max(120).optional().or(z.literal("")),
-  bio: z.string().max(500).optional().or(z.literal("")),
+  bio: z
+    .string()
+    .max(PROFILE_BIO_MAX_LENGTH, {
+      message: `Bio must be at most ${PROFILE_BIO_MAX_LENGTH} characters.`,
+    })
+    .optional()
+    .or(z.literal("")),
   phone: z.string().max(32).optional().or(z.literal("")),
   website: lenientUrlField,
   address: z
