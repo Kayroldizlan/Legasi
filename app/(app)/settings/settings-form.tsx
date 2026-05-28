@@ -193,6 +193,21 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
     return trimmed.length > 0 ? trimmed : null;
   };
 
+  /** Fields the user can edit through the personal-information form. */
+  const EDITABLE_PROFILE_KEYS = [
+    "full_name",
+    "username",
+    "occupation",
+    "company",
+    "bio",
+    "phone",
+    "website",
+    "address",
+    "city",
+    "country",
+  ] as const;
+  type EditableProfileKey = (typeof EDITABLE_PROFILE_KEYS)[number];
+
   const onSubmitProfile = async (values: ProfileInput) => {
     const normalized = {
       full_name: values.full_name.trim(),
@@ -205,55 +220,31 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       address: cleanString(values.address),
       city: cleanString(values.city),
       country: cleanString(values.country),
-    };
+    } satisfies Record<EditableProfileKey, string | null>;
 
-    // Snapshot the current visible fields so we can roll back on failure.
-    const previous: Partial<Profile> = {
-      full_name: profile.full_name,
-      username: profile.username,
-      occupation: profile.occupation,
-      company: profile.company,
-      bio: profile.bio,
-      phone: profile.phone,
-      website: profile.website,
-      address: profile.address,
-      city: profile.city,
-      country: profile.country,
-    };
-
-    // Optimistic update — sidebar/topbar/store reflect the new values
-    // before the network roundtrip finishes, so the UI feels instant.
-    patchProfile(normalized as Partial<Profile>);
-    setSavingProfile(true);
-    const toastId = toast.loading("Saving profile…");
-
-    const { error } = await supabase
-      .from("profiles")
-      .update(normalized as never)
-      .eq("id", profile.id);
-
-    setSavingProfile(false);
-
-    if (error) {
-      // Roll back the optimistic patch so the UI matches reality.
-      patchProfile(previous);
-
-      if (
-        error.code === "23505" ||
-        /duplicate key|unique constraint/i.test(error.message)
-      ) {
-        toast.error("That username is already taken. Try another one.", {
-          id: toastId,
-        });
-      } else {
-        toast.error(error.message || "Could not save profile.", { id: toastId });
+    // Only send fields that actually changed so the UPDATE payload is
+    // minimal and we can short-circuit no-op saves entirely.
+    const diff: Partial<Record<EditableProfileKey, string | null>> = {};
+    const previous: Partial<Record<EditableProfileKey, string | null>> = {};
+    for (const key of EDITABLE_PROFILE_KEYS) {
+      const next = normalized[key];
+      const current = profile[key] as string | null;
+      if (next !== current) {
+        diff[key] = next;
+        previous[key] = current;
       }
+    }
+
+    if (Object.keys(diff).length === 0) {
+      toast.success("Nothing to save");
       return;
     }
 
-    // Sync the form back to the normalized values (e.g. lowercased username,
-    // trimmed strings, https://-prefixed website) so the inputs reflect what
-    // was actually saved.
+    // OPTIMISTIC UI — apply the change locally and show the success toast
+    // immediately, before the network roundtrip. The store update makes the
+    // sidebar / topbar / any other zustand-bound surface reflect the new
+    // values the instant the user clicks Save.
+    patchProfile(diff as Partial<Profile>);
     profileForm.reset({
       full_name: normalized.full_name,
       username: normalized.username,
@@ -266,11 +257,47 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       city: normalized.city ?? "",
       country: normalized.country ?? "",
     });
+    toast.success("Profile saved");
 
-    toast.success("Profile saved", { id: toastId });
-    // NOTE: no router.refresh() — zustand already reflects the new values
-    // everywhere the profile is shown, and a Server Component refresh would
-    // just add 300–800 ms of perceived latency.
+    // Verify in the background. The button stays briefly disabled to
+    // prevent double-submits, but the user has already had instant
+    // feedback so the perceived latency is zero.
+    setSavingProfile(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update(diff as never)
+      .eq("id", profile.id);
+    setSavingProfile(false);
+
+    if (!error) return;
+
+    // Save failed — roll back the optimistic patch and surface the issue.
+    patchProfile(previous as Partial<Profile>);
+    profileForm.reset({
+      full_name: (previous.full_name ?? profile.full_name) as string,
+      username: (previous.username ?? profile.username) as string,
+      occupation: previous.occupation ?? profile.occupation ?? "",
+      company: previous.company ?? profile.company ?? "",
+      bio: previous.bio ?? profile.bio ?? "",
+      phone: previous.phone ?? profile.phone ?? "",
+      website: previous.website ?? profile.website ?? "",
+      address: previous.address ?? profile.address ?? "",
+      city: previous.city ?? profile.city ?? "",
+      country: previous.country ?? profile.country ?? "",
+    });
+
+    if (
+      error.code === "23505" ||
+      /duplicate key|unique constraint/i.test(error.message)
+    ) {
+      toast.error(
+        "That username is already taken — your changes were rolled back.",
+      );
+    } else {
+      toast.error(
+        `Could not save profile: ${error.message || "please try again"}`,
+      );
+    }
   };
 
   /** Show the first Zod validation error in a toast so users never wonder
@@ -297,21 +324,9 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       twitter: normalizeUrl(values.twitter),
     };
 
-    setSavingSocials(true);
-    const toastId = toast.loading("Saving social links…");
-
-    const { error } = await supabase
-      .from("social_links")
-      .upsert(payload as never, { onConflict: "profile_id" });
-
-    setSavingSocials(false);
-
-    if (error) {
-      toast.error(error.message || "Could not save links.", { id: toastId });
-      return;
-    }
-
-    // Sync the form to the normalized values so inputs reflect saved state.
+    // Optimistic UI — reset the form to the normalized values and tell the
+    // user it's saved right away. The actual upsert finishes in the
+    // background and only surfaces if it fails.
     socialsForm.reset({
       facebook: payload.facebook ?? "",
       instagram: payload.instagram ?? "",
@@ -320,8 +335,17 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       whatsapp: payload.whatsapp ?? "",
       twitter: payload.twitter ?? "",
     });
+    toast.success("Social links saved");
 
-    toast.success("Social links saved", { id: toastId });
+    setSavingSocials(true);
+    const { error } = await supabase
+      .from("social_links")
+      .upsert(payload as never, { onConflict: "profile_id" });
+    setSavingSocials(false);
+
+    if (error) {
+      toast.error(error.message || "Could not save links — please try again.");
+    }
   };
 
   const onSocialsFormError = (
