@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import * as React from "react";
 import { useForm } from "react-hook-form";
@@ -445,12 +446,15 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
             <Textarea label="Bio" rows={4} {...profileForm.register("bio")} error={profileForm.formState.errors.bio?.message} />
           </div>
           <div className="sm:col-span-2 flex justify-end">
-            <Button
-              type="submit"
-              disabled={savingProfile}
-              loading={savingProfile}
-            >
-              {savingProfile ? "Saving…" : "Save changes"}
+            <Button type="submit" disabled={savingProfile}>
+              {savingProfile ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save changes"
+              )}
             </Button>
           </div>
         </form>
