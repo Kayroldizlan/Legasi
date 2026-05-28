@@ -99,16 +99,21 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
         }
       });
 
-      // 2) Optimistic local preview — user sees the new image instantly,
-      //    while the network upload + DB write run in the background.
+      // 2) Optimistic local preview + immediate success toast — the user
+      //    sees their new image AND a "saved" confirmation the moment
+      //    compression finishes. The upload + DB write run silently in
+      //    the background.
       optimisticUrl = URL.createObjectURL(optimized);
       if (field === "avatar_url") setAvatarUrl(optimisticUrl);
       else setCoverUrl(optimisticUrl);
       patchProfile({ [field]: optimisticUrl } as Partial<Profile>);
 
-      toast.loading(`Uploading ${label}…`, { id: toastId });
+      toast.success(
+        field === "avatar_url" ? "Avatar updated" : "Cover updated",
+        { id: toastId },
+      );
 
-      // 3) Upload + DB update.
+      // 3) Background upload + DB update. Errors get their own toast.
       const path = `${profile.id}/${field}-${Date.now()}.webp`;
       const { error: uploadErr } = await supabase.storage
         .from(bucket)
@@ -129,27 +134,27 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
         .eq("id", profile.id);
       if (dbErr) throw dbErr;
 
-      // 4) Swap optimistic blob URL → public CDN URL.
+      // 4) Silently swap optimistic blob URL → public CDN URL so the
+      //    image keeps working after this tab is closed or refreshed.
       if (field === "avatar_url") setAvatarUrl(publicUrl);
       else setCoverUrl(publicUrl);
       patchProfile({ [field]: publicUrl } as Partial<Profile>);
-
-      toast.success("Image updated", { id: toastId });
-      // NOTE: deliberately no router.refresh() — local state + zustand are
-      // already updated and a full Server Component re-render would just add
-      // 300–800 ms of perceived latency for no visible change.
+      // NOTE: deliberately no router.refresh() — zustand already holds
+      // the new URL and a Server Component refresh would just add
+      // 300–800 ms of jank for no visible change.
     } catch (err) {
-      // Roll back the optimistic preview so the user doesn't think it worked.
+      // Roll back the optimistic preview so reality and UI agree.
       if (field === "avatar_url") setAvatarUrl(previousUrl);
       else setCoverUrl(previousUrl);
       patchProfile({ [field]: previousUrl } as Partial<Profile>);
 
       const message =
         err instanceof Error ? err.message : "Could not update image.";
-      toast.error(message, { id: toastId });
+      toast.error(`${message} — please try again.`);
     } finally {
-      // Defer the blob URL revoke so any in-flight <Image> render that picked
-      // it up can finish before the browser invalidates the handle.
+      // Defer the blob URL revoke so any in-flight <Image> render that
+      // picked it up can finish before the browser invalidates the
+      // handle.
       if (optimisticUrl) {
         const url = optimisticUrl;
         setTimeout(() => URL.revokeObjectURL(url), 2000);
@@ -158,31 +163,26 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   };
 
   const removeImage = async (field: "avatar_url" | "cover_url") => {
-    const toastId = toast.loading("Removing…");
     const previousUrl = field === "avatar_url" ? avatarUrl : coverUrl;
 
-    // Optimistic clear so the UI updates instantly.
+    // OPTIMISTIC: clear locally and confirm immediately. The DB write
+    // happens in the background.
     if (field === "avatar_url") setAvatarUrl(null);
     else setCoverUrl(null);
     patchProfile({ [field]: null } as Partial<Profile>);
+    toast.success("Image removed");
 
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ [field]: null } as never)
-        .eq("id", profile.id);
-      if (error) throw error;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ [field]: null } as never)
+      .eq("id", profile.id);
 
-      toast.success("Image removed", { id: toastId });
-    } catch (err) {
-      // Roll back the optimistic clear.
+    if (error) {
+      // Roll back so the UI matches the actual DB state.
       if (field === "avatar_url") setAvatarUrl(previousUrl);
       else setCoverUrl(previousUrl);
       patchProfile({ [field]: previousUrl } as Partial<Profile>);
-
-      const message =
-        err instanceof Error ? err.message : "Could not remove image.";
-      toast.error(message, { id: toastId });
+      toast.error(error.message || "Could not remove image — please try again.");
     }
   };
 
@@ -193,22 +193,16 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
     return trimmed.length > 0 ? trimmed : null;
   };
 
-  /** Fields the user can edit through the personal-information form. */
-  const EDITABLE_PROFILE_KEYS = [
-    "full_name",
-    "username",
-    "occupation",
-    "company",
-    "bio",
-    "phone",
-    "website",
-    "address",
-    "city",
-    "country",
-  ] as const;
-  type EditableProfileKey = (typeof EDITABLE_PROFILE_KEYS)[number];
-
   const onSubmitProfile = async (values: ProfileInput) => {
+    // No-op detection that's robust against "change → save → change back"
+    // sequences. `isDirty` is keyed off the last form.reset(), so after a
+    // successful save the form is considered pristine again — and only
+    // becomes dirty when the user actually edits something new.
+    if (!profileForm.formState.isDirty) {
+      toast.success("Nothing to save");
+      return;
+    }
+
     const normalized = {
       full_name: values.full_name.trim(),
       username: values.username.toLowerCase().trim(),
@@ -220,31 +214,27 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       address: cleanString(values.address),
       city: cleanString(values.city),
       country: cleanString(values.country),
-    } satisfies Record<EditableProfileKey, string | null>;
+    };
 
-    // Only send fields that actually changed so the UPDATE payload is
-    // minimal and we can short-circuit no-op saves entirely.
-    const diff: Partial<Record<EditableProfileKey, string | null>> = {};
-    const previous: Partial<Record<EditableProfileKey, string | null>> = {};
-    for (const key of EDITABLE_PROFILE_KEYS) {
-      const next = normalized[key];
-      const current = profile[key] as string | null;
-      if (next !== current) {
-        diff[key] = next;
-        previous[key] = current;
-      }
-    }
+    // Snapshot every editable field so rollback restores the form and
+    // store to exactly what the user saw before clicking Save.
+    const previous = {
+      full_name: profile.full_name,
+      username: profile.username,
+      occupation: profile.occupation,
+      company: profile.company,
+      bio: profile.bio,
+      phone: profile.phone,
+      website: profile.website,
+      address: profile.address,
+      city: profile.city,
+      country: profile.country,
+    };
 
-    if (Object.keys(diff).length === 0) {
-      toast.success("Nothing to save");
-      return;
-    }
-
-    // OPTIMISTIC UI — apply the change locally and show the success toast
-    // immediately, before the network roundtrip. The store update makes the
-    // sidebar / topbar / any other zustand-bound surface reflect the new
-    // values the instant the user clicks Save.
-    patchProfile(diff as Partial<Profile>);
+    // OPTIMISTIC UI — store + form update instantly, success toast
+    // appears in the same render frame. The user-perceived latency is
+    // bounded by browser frame time, not the Supabase roundtrip.
+    patchProfile(normalized as Partial<Profile>);
     profileForm.reset({
       full_name: normalized.full_name,
       username: normalized.username,
@@ -259,31 +249,30 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
     });
     toast.success("Profile saved");
 
-    // Verify in the background. The button stays briefly disabled to
-    // prevent double-submits, but the user has already had instant
-    // feedback so the perceived latency is zero.
+    // Background verification. The Save button is briefly disabled to
+    // prevent rapid double-submits.
     setSavingProfile(true);
     const { error } = await supabase
       .from("profiles")
-      .update(diff as never)
+      .update(normalized as never)
       .eq("id", profile.id);
     setSavingProfile(false);
 
     if (!error) return;
 
-    // Save failed — roll back the optimistic patch and surface the issue.
+    // Roll the optimistic update back to match the actual DB state.
     patchProfile(previous as Partial<Profile>);
     profileForm.reset({
-      full_name: (previous.full_name ?? profile.full_name) as string,
-      username: (previous.username ?? profile.username) as string,
-      occupation: previous.occupation ?? profile.occupation ?? "",
-      company: previous.company ?? profile.company ?? "",
-      bio: previous.bio ?? profile.bio ?? "",
-      phone: previous.phone ?? profile.phone ?? "",
-      website: previous.website ?? profile.website ?? "",
-      address: previous.address ?? profile.address ?? "",
-      city: previous.city ?? profile.city ?? "",
-      country: previous.country ?? profile.country ?? "",
+      full_name: previous.full_name,
+      username: previous.username,
+      occupation: previous.occupation ?? "",
+      company: previous.company ?? "",
+      bio: previous.bio ?? "",
+      phone: previous.phone ?? "",
+      website: previous.website ?? "",
+      address: previous.address ?? "",
+      city: previous.city ?? "",
+      country: previous.country ?? "",
     });
 
     if (
@@ -314,6 +303,11 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
   };
 
   const onSubmitSocials = async (values: SocialLinksInput) => {
+    if (!socialsForm.formState.isDirty) {
+      toast.success("Nothing to save");
+      return;
+    }
+
     const payload = {
       profile_id: profile.id,
       facebook: normalizeUrl(values.facebook),
