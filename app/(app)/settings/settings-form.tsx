@@ -21,6 +21,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { compressAvatar, compressCover } from "@/lib/upload-image";
 import {
+  normalizeUrl,
   profileSchema,
   socialLinksSchema,
   type ProfileInput,
@@ -187,47 +188,95 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
     }
   };
 
+  /** Convert empty strings to null and trim whitespace. */
+  const cleanString = (v: string | undefined | null): string | null => {
+    if (v == null) return null;
+    const trimmed = v.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  };
+
   const onSubmitProfile = async (values: ProfileInput) => {
     setSavingProfile(true);
+
+    const normalized = {
+      full_name: values.full_name.trim(),
+      username: values.username.toLowerCase().trim(),
+      occupation: cleanString(values.occupation),
+      company: cleanString(values.company),
+      bio: cleanString(values.bio),
+      phone: cleanString(values.phone),
+      website: normalizeUrl(values.website),
+      address: cleanString(values.address),
+      city: cleanString(values.city),
+      country: cleanString(values.country),
+    };
+
     const { error } = await supabase
       .from("profiles")
-      .update({
-        full_name: values.full_name,
-        username: values.username.toLowerCase(),
-        occupation: values.occupation || null,
-        company: values.company || null,
-        bio: values.bio || null,
-        phone: values.phone || null,
-        website: values.website || null,
-        address: values.address || null,
-        city: values.city || null,
-        country: values.country || null,
-      } as never)
+      .update(normalized as never)
       .eq("id", profile.id);
+
     setSavingProfile(false);
-    if (error) return toast.error(error.message);
-    patchProfile(values as Partial<Profile>);
+
+    if (error) {
+      // Friendly unique-violation message for username collisions.
+      if (
+        error.code === "23505" ||
+        /duplicate key|unique constraint/i.test(error.message)
+      ) {
+        toast.error("That username is already taken. Try another one.");
+      } else {
+        toast.error(error.message || "Could not save profile.");
+      }
+      return;
+    }
+
+    patchProfile(normalized as Partial<Profile>);
     toast.success("Profile saved");
     router.refresh();
+  };
+
+  /** Show the first Zod validation error in a toast so users never wonder
+   *  why the Save button "did nothing". */
+  const onProfileFormError = (
+    errors: typeof profileForm.formState.errors,
+  ) => {
+    const first = Object.values(errors).find((e) => e && "message" in e);
+    const message =
+      first && "message" in first && typeof first.message === "string"
+        ? first.message
+        : "Please fix the highlighted fields and try again.";
+    toast.error(message);
   };
 
   const onSubmitSocials = async (values: SocialLinksInput) => {
     setSavingSocials(true);
     const payload = {
       profile_id: profile.id,
-      facebook: values.facebook || null,
-      instagram: values.instagram || null,
-      tiktok: values.tiktok || null,
-      linkedin: values.linkedin || null,
-      whatsapp: values.whatsapp || null,
-      twitter: values.twitter || null,
+      facebook: normalizeUrl(values.facebook),
+      instagram: normalizeUrl(values.instagram),
+      tiktok: normalizeUrl(values.tiktok),
+      linkedin: normalizeUrl(values.linkedin),
+      whatsapp: cleanString(values.whatsapp),
+      twitter: normalizeUrl(values.twitter),
     };
     const { error } = await supabase
       .from("social_links")
       .upsert(payload as never, { onConflict: "profile_id" });
     setSavingSocials(false);
-    if (error) return toast.error(error.message);
+    if (error) return toast.error(error.message || "Could not save links.");
     toast.success("Social links saved");
+  };
+
+  const onSocialsFormError = (
+    errors: typeof socialsForm.formState.errors,
+  ) => {
+    const first = Object.values(errors).find((e) => e && "message" in e);
+    const message =
+      first && "message" in first && typeof first.message === "string"
+        ? first.message
+        : "Please fix the highlighted fields and try again.";
+    toast.error(message);
   };
 
   return (
@@ -281,7 +330,10 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
             This information appears on your public profile.
           </CardDescription>
         </CardHeader>
-        <form onSubmit={profileForm.handleSubmit(onSubmitProfile)} className="grid gap-4 sm:grid-cols-2">
+        <form
+          onSubmit={profileForm.handleSubmit(onSubmitProfile, onProfileFormError)}
+          className="grid gap-4 sm:grid-cols-2"
+        >
           <Input label="Full name" {...profileForm.register("full_name")} error={profileForm.formState.errors.full_name?.message} />
           <Input label="Username" {...profileForm.register("username")} error={profileForm.formState.errors.username?.message} />
           <Input label="Occupation" {...profileForm.register("occupation")} />
@@ -307,7 +359,10 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
           <CardTitle>Social links</CardTitle>
           <CardDescription>Help people find you across the web.</CardDescription>
         </CardHeader>
-        <form onSubmit={socialsForm.handleSubmit(onSubmitSocials)} className="grid gap-4 sm:grid-cols-2">
+        <form
+          onSubmit={socialsForm.handleSubmit(onSubmitSocials, onSocialsFormError)}
+          className="grid gap-4 sm:grid-cols-2"
+        >
           <Input label="LinkedIn" placeholder="https://linkedin.com/in/…" {...socialsForm.register("linkedin")} error={socialsForm.formState.errors.linkedin?.message} />
           <Input label="X / Twitter" placeholder="https://x.com/…" {...socialsForm.register("twitter")} error={socialsForm.formState.errors.twitter?.message} />
           <Input label="Facebook" placeholder="https://facebook.com/…" {...socialsForm.register("facebook")} error={socialsForm.formState.errors.facebook?.message} />
