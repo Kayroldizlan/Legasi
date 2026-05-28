@@ -3,17 +3,22 @@
 import { createBrowserClient } from "@supabase/ssr";
 
 /**
- * Browser-side Supabase client.
- * Safe to import in Client Components only.
+ * Browser-side Supabase client (singleton).
  *
- * Note: we intentionally don't pass a `Database` generic — we rely on
- * the hand-written types in `@/types/database` and cast at call sites.
- * This keeps the surface area simple and avoids version-coupled type
- * drift with `@supabase/ssr`.
+ * Creating a new client on every call causes multiple auth lock
+ * contenders and can hang `getSession()` / `.update()` indefinitely
+ * when AuthProvider, settings form, and other components each spin up
+ * their own instance.
  */
+let browserClient: ReturnType<typeof createBrowserClient> | undefined;
+
 export function createClient() {
-  return createBrowserClient(
+  if (browserClient) return browserClient;
+
+  browserClient = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
+
+  return browserClient;
 }

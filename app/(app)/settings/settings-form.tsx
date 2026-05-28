@@ -272,6 +272,13 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
     console.log("SET LOADING TRUE");
     setSavingProfile(true);
 
+    // Safety net: if any awaited Supabase call hangs, still reset the
+    // button even if finally somehow fails to run on time.
+    const safetyResetId = window.setTimeout(() => {
+      console.log("SAFETY LOADING RESET");
+      setSavingProfile(false);
+    }, PROFILE_SAVE_TIMEOUT_MS + 2_000);
+
     try {
       // OPTIMISTIC UI — store + form update instantly, success toast
       // appears in the same render frame. The user-perceived latency is
@@ -292,13 +299,6 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
       toast.success("Profile saved");
 
       console.log("BEFORE SUPABASE");
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      console.log("AUTH SESSION", {
-        hasSession: Boolean(sessionData.session),
-        sessionError: sessionError?.message ?? null,
-      });
-
       const { error } = await updateProfileWithTimeout(
         supabase,
         profile.id,
@@ -359,6 +359,7 @@ export function ProfileSettingsForm({ profile, socials }: Props) {
         error instanceof Error ? error.message : "Unknown save error";
       toast.error(`Could not save profile: ${message}`);
     } finally {
+      window.clearTimeout(safetyResetId);
       console.log("ENTER FINALLY");
       console.log("SET LOADING FALSE");
       console.log("CURRENT savingProfile", savingProfile);
