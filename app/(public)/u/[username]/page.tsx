@@ -15,8 +15,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 
-import { Footer } from "@/components/layout/footer";
-import { PublicNavbar } from "@/components/layout/public-navbar";
 import { ProfileActions } from "@/components/profile/profile-actions";
 import { ProfileCard } from "@/components/profile/profile-card";
 import { ProfileShareCard } from "@/components/profile/profile-share-card";
@@ -299,12 +297,9 @@ export default async function PublicProfilePage({ params }: PageProps) {
   // -- Render -------------------------------------------------------------
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <PublicNavbar />
-
-      <main className="flex-1 bg-surface-muted">
-        {/* Hero: cover with floating QR */}
-        <div className="relative h-44 w-full overflow-hidden bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800 sm:h-60 lg:h-72">
+    <div className="bg-surface-muted">
+      {/* Hero: cover with floating QR */}
+      <div className="relative h-44 w-full overflow-hidden bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800 sm:h-60 lg:h-72">
           {profile.cover_url ? (
             <Image
               src={profile.cover_url}
@@ -460,9 +455,6 @@ export default async function PublicProfilePage({ params }: PageProps) {
             />
           </div>
         </div>
-      </main>
-
-      <Footer />
     </div>
   );
 }
