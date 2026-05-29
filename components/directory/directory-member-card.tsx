@@ -1,20 +1,25 @@
-import { ArrowDown, Heart, MessageSquare, Users } from "lucide-react";
+import { ArrowDown, Check, Heart, MessageSquare, Users } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
 import { formatObjectPosition } from "@/lib/profile-image-position";
-import { buildProfileUrl } from "@/lib/utils";
+import { buildProfileUrl, cn } from "@/lib/utils";
 
+import type { DirectoryConnectionState } from "@/services/connections";
 import type { Profile } from "@/types/database";
 
 interface DirectoryMemberCardProps {
   profile: Profile;
   connectionsCount?: number;
+  connection?: DirectoryConnectionState;
+  isOwn?: boolean;
 }
 
 export function DirectoryMemberCard({
   profile,
   connectionsCount = 0,
+  connection,
+  isOwn = false,
 }: DirectoryMemberCardProps) {
   const href = buildProfileUrl(profile.username);
   const location = [profile.city, profile.address, profile.country]
@@ -76,23 +81,134 @@ export function DirectoryMemberCard({
           </span>
         </div>
 
+        <DirectoryMemberCardActions
+          profile={profile}
+          href={href}
+          connection={connection}
+          isOwn={isOwn}
+        />
+      </div>
+    </article>
+  );
+}
+
+function DirectoryMemberCardActions({
+  profile,
+  href,
+  connection,
+  isOwn,
+}: {
+  profile: Profile;
+  href: string;
+  connection?: DirectoryConnectionState;
+  isOwn: boolean;
+}) {
+  const primaryClass =
+    "inline-flex flex-1 items-center justify-center rounded-xl px-3 py-2 text-sm font-medium transition";
+  const iconClass =
+    "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition hover:bg-zinc-50";
+
+  if (isOwn) {
+    return (
+      <div className="flex gap-2">
+        <Link
+          href="/settings"
+          className={cn(primaryClass, "border border-brand-600 text-brand-600 hover:bg-brand-50")}
+        >
+          Edit profile
+        </Link>
+      </div>
+    );
+  }
+
+  if (connection?.kind === "accepted") {
+    return (
+      <div className="flex gap-2">
+        <Link
+          href={`/messages/${profile.id}`}
+          className={cn(
+            primaryClass,
+            "bg-brand-600 text-white hover:bg-brand-700 shadow-[0_8px_24px_rgb(239_68_68/0.18)]",
+          )}
+        >
+          <MessageSquare className="mr-1.5 h-4 w-4" />
+          Message
+        </Link>
+        <Link
+          href={href}
+          className={iconClass}
+          aria-label={`View ${profile.full_name}'s profile`}
+        >
+          <Check className="h-4 w-4 text-emerald-600" />
+        </Link>
+      </div>
+    );
+  }
+
+  if (connection?.kind === "pending") {
+    if (connection.direction === "sent") {
+      return (
         <div className="flex gap-2">
-          <Link
-            href={href}
-            className="inline-flex flex-1 items-center justify-center rounded-xl border border-brand-600 px-3 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50"
+          <span
+            className={cn(
+              primaryClass,
+              "border border-zinc-200 bg-zinc-50 text-zinc-500",
+            )}
           >
-            Connect
-          </Link>
+            Request sent
+          </span>
           <Link
             href={href}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition hover:bg-zinc-50"
-            aria-label={`Message ${profile.full_name}`}
+            className={iconClass}
+            aria-label={`View ${profile.full_name}'s profile`}
           >
             <MessageSquare className="h-4 w-4" />
           </Link>
         </div>
+      );
+    }
+
+    return (
+      <div className="flex gap-2">
+        <Link
+          href={href}
+          className={cn(
+            primaryClass,
+            "border border-brand-600 text-brand-600 hover:bg-brand-50",
+          )}
+        >
+          Respond
+        </Link>
+        <Link
+          href={href}
+          className={iconClass}
+          aria-label={`View ${profile.full_name}'s profile`}
+        >
+          <MessageSquare className="h-4 w-4" />
+        </Link>
       </div>
-    </article>
+    );
+  }
+
+  return (
+    <div className="flex gap-2">
+      <Link
+        href={href}
+        className={cn(
+          primaryClass,
+          "border border-brand-600 text-brand-600 hover:bg-brand-50",
+        )}
+      >
+        Connect
+      </Link>
+      <Link
+        href={href}
+        className={iconClass}
+        aria-label={`View ${profile.full_name}'s profile`}
+      >
+        <MessageSquare className="h-4 w-4" />
+      </Link>
+    </div>
   );
 }
 

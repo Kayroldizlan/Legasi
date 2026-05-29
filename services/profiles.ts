@@ -9,6 +9,106 @@ import type { DirectoryFilters, PaginatedResult } from "@/types";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SB = SupabaseClient<any, any, any>;
 
+function escapeIlike(value: string) {
+  return value.replace(/[\\%,]/g, "");
+}
+
+function emptyResult(page: number, pageSize: number): PaginatedResult<Profile> {
+  return {
+    data: [],
+    total: 0,
+    page,
+    pageSize,
+    totalPages: 1,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ProfileQuery = any;
+
+async function getCommunityProfileIds(supabase: SB): Promise<string[]> {
+  const { data, error } = await supabase.from("relations").select("user_id");
+  if (error) throw error;
+  return [...new Set((data ?? []).map((row) => row.user_id as string))];
+}
+
+function applyProfileFilters(
+  query: ProfileQuery,
+  filters: Partial<DirectoryFilters>,
+  communityIds?: string[] | null,
+) {
+  let next = query.eq("status", "approved");
+
+  if (communityIds) {
+    next = next.in("id", communityIds);
+  }
+
+  if (filters.query?.trim()) {
+    const q = escapeIlike(filters.query.trim());
+    next = next.or(
+      `full_name.ilike.%${q}%,username.ilike.%${q}%,occupation.ilike.%${q}%,company.ilike.%${q}%,city.ilike.%${q}%,address.ilike.%${q}%`,
+    );
+  }
+
+  if (filters.occupation?.trim()) {
+    next = next.ilike("occupation", `%${escapeIlike(filters.occupation.trim())}%`);
+  }
+  if (filters.city?.trim()) {
+    const city = escapeIlike(filters.city.trim());
+    next = next.or(`city.ilike.%${city}%,address.ilike.%${city}%`);
+  }
+  if (filters.country?.trim()) {
+    next = next.ilike("country", `%${escapeIlike(filters.country.trim())}%`);
+  }
+  if (filters.company?.trim()) {
+    next = next.ilike("company", `%${escapeIlike(filters.company.trim())}%`);
+  }
+
+  switch (filters.category) {
+    case "verified":
+      next = next.eq("is_verified", true);
+      break;
+    case "businesses":
+      next = next.not("company", "is", null).neq("company", "");
+      break;
+    case "people":
+      next = next.or("company.is.null,company.eq.");
+      break;
+    case "families":
+      next = next.not("address", "is", null).neq("address", "");
+      break;
+    default:
+      break;
+  }
+
+  return next;
+}
+
+async function sortPageByConnections(
+  supabase: SB,
+  profiles: Profile[],
+): Promise<Profile[]> {
+  if (profiles.length === 0) return profiles;
+
+  const { data: stats, error } = await supabase
+    .from("profile_stats")
+    .select("id, connections_count")
+    .in(
+      "id",
+      profiles.map((profile) => profile.id),
+    );
+
+  if (error || !stats) return profiles;
+
+  const countMap = Object.fromEntries(
+    stats.map((row) => [row.id as string, (row.connections_count as number) ?? 0]),
+  );
+
+  return [...profiles].sort(
+    (a, b) => (countMap[b.id] ?? 0) - (countMap[a.id] ?? 0),
+  );
+}
+
 /**
  * Server-side directory search with filters, sort, and pagination.
  */
@@ -21,43 +121,26 @@ export async function searchProfiles(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  let query = supabase
-    .from("profiles")
-    .select("*", { count: "exact" })
-    .eq("status", "approved");
-
-  if (filters.query?.trim()) {
-    const q = filters.query.trim().replace(/[%,]/g, "");
-    query = query.or(
-      `full_name.ilike.%${q}%,username.ilike.%${q}%,occupation.ilike.%${q}%,company.ilike.%${q}%`,
-    );
+  let communityIds: string[] | null = null;
+  if (filters.category === "communities") {
+    communityIds = await getCommunityProfileIds(supabase);
+    if (communityIds.length === 0) return emptyResult(page, pageSize);
   }
-  if (filters.occupation) query = query.ilike("occupation", `%${filters.occupation}%`);
-  if (filters.city)       query = query.ilike("city", `%${filters.city}%`);
-  if (filters.country)    query = query.ilike("country", `%${filters.country}%`);
-  if (filters.company)    query = query.ilike("company", `%${filters.company}%`);
 
-  switch (filters.category) {
-    case "verified":
-      query = query.eq("is_verified", true);
-      break;
-    case "businesses":
-      query = query.not("company", "is", null).neq("company", "");
-      break;
-    case "families":
-      query = query.not("address", "is", null).neq("address", "");
-      break;
-    default:
-      break;
-  }
+  let query = applyProfileFilters(
+    supabase.from("profiles").select("*", { count: "exact" }),
+    filters,
+    communityIds,
+  );
 
   switch (filters.sort) {
     case "alphabetical":
       query = query.order("full_name", { ascending: true });
       break;
     case "most_connected":
-      // RLS-safe approximation: order by created_at then resolve counts client-side
-      query = query.order("is_verified", { ascending: false }).order("created_at", { ascending: false });
+      query = query
+        .order("is_verified", { ascending: false })
+        .order("created_at", { ascending: false });
       break;
     case "newest":
     default:
@@ -67,9 +150,15 @@ export async function searchProfiles(
   const { data, count, error } = await query.range(from, to);
   if (error) throw error;
 
+  let profiles = (data ?? []) as Profile[];
+
+  if (filters.sort === "most_connected") {
+    profiles = await sortPageByConnections(supabase, profiles);
+  }
+
   const total = count ?? 0;
   return {
-    data: (data ?? []) as Profile[],
+    data: profiles,
     total,
     page,
     pageSize,

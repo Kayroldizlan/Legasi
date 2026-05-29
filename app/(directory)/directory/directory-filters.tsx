@@ -43,10 +43,16 @@ export function DirectoryFilters() {
         else next.set(k, v);
       });
       if (!("page" in patch)) next.delete("page");
-      router.push(`${pathname}?${next.toString()}`);
+      const qs = next.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname);
+      router.refresh();
     },
     [params, pathname, router],
   );
+
+  React.useEffect(() => {
+    setQ(params.get("q") ?? "");
+  }, [params]);
 
   React.useEffect(() => {
     const id = setTimeout(() => {
@@ -78,6 +84,7 @@ export function DirectoryFilters() {
           />
           <button
             type="button"
+            onClick={() => update({ q: q.trim() || null })}
             className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-brand-600 text-white"
             aria-label="Search"
           >
@@ -189,7 +196,7 @@ export function DirectoryFilters() {
         </div>
       </div>
 
-      {(q || hasAdvanced) && (
+      {(q || hasAdvanced || (category && category !== "all")) && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
           <span>Active filters:</span>
           {q && (
@@ -204,6 +211,11 @@ export function DirectoryFilters() {
           {city && <Chip onClear={() => update({ city: null })}>City: {city}</Chip>}
           {country && (
             <Chip onClear={() => update({ country: null })}>Country: {country}</Chip>
+          )}
+          {category && category !== "all" && (
+            <Chip onClear={() => update({ category: null })}>
+              Category: {CATEGORY_CHIPS.find((c) => c.id === category)?.label ?? category}
+            </Chip>
           )}
         </div>
       )}

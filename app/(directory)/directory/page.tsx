@@ -6,6 +6,7 @@ import { DirectoryStatsBar } from "@/components/directory/directory-stats-bar";
 import { ProfileCardSkeleton } from "@/components/ui";
 import { PROFILE_PAGE_SIZE } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
+import { getConnectionStatesForProfiles } from "@/services/connections";
 import { searchProfiles } from "@/services/profiles";
 
 import { DirectoryFilters } from "./directory-filters";
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
   description: "Search and connect with members of the Legasi directory.",
 };
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   searchParams: Promise<{
@@ -50,9 +51,25 @@ export default async function DirectoryPage({ searchParams }: PageProps) {
   };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const [result, membersRes, connectionsRes] = await Promise.all([
-    searchProfiles(supabase, filters),
+  let result;
+  try {
+    result = await searchProfiles(supabase, filters);
+  } catch (error) {
+    console.error("[directory] searchProfiles failed:", error);
+    result = {
+      data: [],
+      total: 0,
+      page: filters.page,
+      pageSize: filters.pageSize,
+      totalPages: 1,
+    };
+  }
+
+  const [membersRes, connectionsRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("*", { count: "exact", head: true })
@@ -74,6 +91,25 @@ export default async function DirectoryPage({ searchParams }: PageProps) {
   const statsByProfileId = Object.fromEntries(
     (statsRows ?? []).map((row) => [row.id, row.connections_count ?? 0]),
   );
+
+  const connectionByProfileId =
+    user && profileIds.length > 0
+      ? await getConnectionStatesForProfiles(supabase, user.id, profileIds).catch(
+          () => ({}),
+        )
+      : {};
+
+  const filterKey = [
+    sp.q,
+    sp.occupation,
+    sp.city,
+    sp.country,
+    sp.company,
+    sp.category,
+    sp.sort,
+    sp.view,
+    sp.page,
+  ].join("|");
 
   return (
     <>
@@ -98,9 +134,12 @@ export default async function DirectoryPage({ searchParams }: PageProps) {
           }
         >
           <DirectoryResults
+            key={filterKey}
             result={result}
             view={sp.view ?? "grid"}
             statsByProfileId={statsByProfileId}
+            connectionByProfileId={connectionByProfileId}
+            viewerId={user?.id ?? null}
           />
         </Suspense>
       </div>

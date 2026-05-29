@@ -11,6 +11,7 @@ import {
 import { ProfileCard } from "@/components/profile/profile-card";
 import { EmptyState } from "@/components/ui";
 
+import type { DirectoryConnectionState } from "@/services/connections";
 import type { Profile } from "@/types/database";
 import type { PaginatedResult } from "@/types";
 
@@ -18,9 +19,17 @@ interface Props {
   result: PaginatedResult<Profile>;
   view: string;
   statsByProfileId: Record<string, number>;
+  connectionByProfileId: Record<string, DirectoryConnectionState>;
+  viewerId: string | null;
 }
 
-export function DirectoryResults({ result, view, statsByProfileId }: Props) {
+export function DirectoryResults({
+  result,
+  view,
+  statsByProfileId,
+  connectionByProfileId,
+  viewerId,
+}: Props) {
   const params = useSearchParams();
   const pathname = usePathname();
 
@@ -60,6 +69,8 @@ export function DirectoryResults({ result, view, statsByProfileId }: Props) {
               key={profile.id}
               profile={profile}
               connectionsCount={statsByProfileId[profile.id] ?? 0}
+              connection={connectionByProfileId[profile.id]}
+              isOwn={viewerId === profile.id}
             />
           ))}
         </div>

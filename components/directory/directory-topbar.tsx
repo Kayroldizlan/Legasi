@@ -29,7 +29,9 @@ export function DirectoryTopbar() {
     if (value) next.set("q", value);
     else next.delete("q");
     next.delete("page");
-    router.push(`/directory?${next.toString()}`);
+    const qs = next.toString();
+    router.push(qs ? `/directory?${qs}` : "/directory");
+    router.refresh();
   };
 
   return (
