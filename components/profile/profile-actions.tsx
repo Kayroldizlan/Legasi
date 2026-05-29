@@ -194,7 +194,7 @@ export function ProfileActions({
         </Button>
       )}
 
-      {(isAccepted || me) && !isPending && (
+      {me && !isAccepted && !isPending && (
         <Link href={`/messages/${profile.id}`} className={outlineClass}>
           <MessageSquare className="h-4 w-4" />
           Message
